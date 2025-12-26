@@ -366,8 +366,7 @@ class MailRepository(context: Context) {
         // Получаем письма с поддержкой MoreAvailable (с лимитом итераций)
         var moreAvailable = true
         var iterations = 0
-        val maxIterations = 100 // Увеличен лимит для больших папок
-        var emptyResponseCount = 0
+        val maxIterations = 500 // Увеличен лимит для очень больших папок (до 50000 писем)
         
         while (moreAvailable && iterations < maxIterations) {
             iterations++
@@ -383,21 +382,10 @@ class MailRepository(context: Context) {
                         return syncEmailsEas(accountId, folderId, retryCount + 1)
                     }
                     
-                    // Если syncKey не изменился и нет писем - выходим (сервер в цикле)
-                    if (result.data.syncKey == syncKey && result.data.emails.isEmpty()) {
-                        emptyResponseCount++
-                        if (emptyResponseCount >= 2) {
-                            moreAvailable = false
-                            break
-                        }
-                    } else {
-                        emptyResponseCount = 0
-                    }
-                    
-                    val prevSyncKey = syncKey
                     syncKey = result.data.syncKey
                     folderDao.updateSyncKey(folderId, syncKey)
                     moreAvailable = result.data.moreAvailable
+                    
                     if (result.data.emails.isNotEmpty()) {
                         // Вставляем письма батчем
                         val emailEntities = result.data.emails.map { email ->

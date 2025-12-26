@@ -52,15 +52,26 @@ private fun PermissionDialog(
             ) {
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.headlineSmall
+                    style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 
-                Text(
-                    text = text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Justify,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
+                // Разбиваем текст на абзацы и добавляем отступ красной строки
+                Column(
+                    modifier = Modifier.padding(top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    text.split("\n\n").forEach { paragraph ->
+                        if (paragraph.isNotBlank()) {
+                            Text(
+                                text = "      $paragraph", // Абзацный отступ
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Justify
+                            )
+                        }
+                    }
+                }
                 
                 Row(
                     modifier = Modifier

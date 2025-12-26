@@ -149,12 +149,27 @@ class EasClient(
                 // Принимаем все сертификаты (самоподписанные)
                 builder.hostnameVerifier { _, _ -> true }
                 builder.sslSocketFactory(createTrustAllSslSocketFactory(), createTrustAllManager())
+            } else {
+                // Используем системный TrustManager (который учитывает network_security_config)
+                // но с TlsSocketFactory для поддержки старых TLS версий (Exchange 2007)
+                val sslContext = try {
+                    SSLContext.getInstance("TLS", "Conscrypt")
+                } catch (_: Exception) {
+                    SSLContext.getInstance("TLS")
+                }
+                sslContext.init(null, null, SecureRandom())
+                
+                // Получаем системный TrustManager (учитывает user certificates из network_security_config)
+                val tmf = javax.net.ssl.TrustManagerFactory.getInstance(
+                    javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm()
+                )
+                tmf.init(null as java.security.KeyStore?)
+                val systemTrustManager = tmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
+                
+                if (systemTrustManager != null) {
+                    builder.sslSocketFactory(TlsSocketFactory(sslContext.socketFactory), systemTrustManager)
+                }
             }
-            // Если acceptAllCerts = false, НЕ переопределяем sslSocketFactory!
-            // OkHttp сам использует системный TrustManager который учитывает:
-            // 1. Системные CA сертификаты
-            // 2. Пользовательские сертификаты (если разрешено в network_security_config)
-            // Переопределение TrustManagerFactory.init(null) даёт ТОЛЬКО системные сертификаты!
         } catch (_: Exception) {
             // Если вся настройка SSL упала - OkHttp использует свои дефолты
         }

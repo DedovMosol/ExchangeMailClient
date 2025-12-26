@@ -819,13 +819,19 @@ private fun DayThemeRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { expanded = true }
-            .padding(vertical = 8.dp),
+            .padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(dayName, modifier = Modifier.weight(1f))
+        Text(
+            text = dayName,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f)
+        )
         
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Box(
                 modifier = Modifier
                     .size(20.dp)
@@ -834,35 +840,41 @@ private fun DayThemeRow(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                getThemeDisplayName(currentTheme, isRu),
+                text = getThemeDisplayName(currentTheme, isRu),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                AppColorTheme.entries.forEach { theme ->
-                    DropdownMenuItem(
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(16.dp)
-                                        .clip(CircleShape)
-                                        .background(theme.gradientStart)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(getThemeDisplayName(theme, isRu))
-                            }
-                        },
-                        onClick = {
-                            onThemeSelected(theme.code)
-                            expanded = false
+            Icon(
+                Icons.Default.ArrowDropDown,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            AppColorTheme.entries.forEach { theme ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(theme.gradientStart)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(getThemeDisplayName(theme, isRu))
                         }
-                    )
-                }
+                    },
+                    onClick = {
+                        onThemeSelected(theme.code)
+                        expanded = false
+                    }
+                )
             }
         }
     }

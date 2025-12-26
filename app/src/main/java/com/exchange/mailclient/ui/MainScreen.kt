@@ -676,11 +676,12 @@ private fun HomeContent(
                             animationSpec = tween(400, easing = FastOutSlowInEasing)
                         )
             ) {
+                val colorTheme = com.exchange.mailclient.ui.theme.LocalColorTheme.current
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.extraLarge,
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFF7C4DFF) // Deep Purple
+                        containerColor = colorTheme.gradientStart
                     )
                 ) {
                     Box(
@@ -689,8 +690,8 @@ private fun HomeContent(
                             .background(
                                 brush = Brush.linearGradient(
                                     colors = listOf(
-                                        Color(0xFF7C4DFF), // Deep Purple A200
-                                        Color(0xFF536DFE)  // Indigo A200
+                                        colorTheme.gradientStart,
+                                        colorTheme.gradientEnd
                                     )
                                 )
                             )
@@ -998,19 +999,27 @@ private fun HomeContent(
                         ) {
                             TipItem(
                                 icon = Icons.Default.Notifications,
-                                text = Strings.tipNotification
+                                text = Strings.tipNotification,
+                                iconColor = Color(0xFFFF9800),
+                                iconBackgroundColor = Color(0xFFFFF3E0)
                             )
                             TipItem(
                                 icon = Icons.Default.BatteryChargingFull,
-                                text = Strings.tipBattery
+                                text = Strings.tipBattery,
+                                iconColor = Color(0xFF4CAF50),
+                                iconBackgroundColor = Color(0xFFE8F5E9)
                             )
                             TipItem(
                                 icon = Icons.Default.Lock,
-                                text = Strings.tipCertificate
+                                text = Strings.tipCertificate,
+                                iconColor = Color(0xFF9C27B0),
+                                iconBackgroundColor = Color(0xFFF3E5F5)
                             )
                             TipItem(
                                 icon = Icons.Default.Info,
-                                text = Strings.tipBeta
+                                text = Strings.tipBeta,
+                                iconColor = Color(0xFF2196F3),
+                                iconBackgroundColor = Color(0xFFE3F2FD)
                             )
                         }
                     }
@@ -1952,23 +1961,34 @@ private fun FolderItem(
 @Composable
 private fun TipItem(
     icon: ImageVector,
-    text: String
+    text: String,
+    iconColor: Color = MaterialTheme.colorScheme.tertiary,
+    iconBackgroundColor: Color = MaterialTheme.colorScheme.tertiaryContainer
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.tertiary
-        )
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(iconBackgroundColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = iconColor
+            )
+        }
         Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = text,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 6.dp)
         )
     }
 }

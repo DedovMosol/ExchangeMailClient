@@ -150,25 +150,20 @@ class EasClient(
                 builder.hostnameVerifier { _, _ -> true }
                 builder.sslSocketFactory(createTrustAllSslSocketFactory(), createTrustAllManager())
             } else {
-                // Используем системный TrustManager (который учитывает network_security_config)
-                // но с TlsSocketFactory для поддержки старых TLS версий (Exchange 2007)
+                // Используем системный TrustManager который учитывает:
+                // 1. Системные сертификаты
+                // 2. Пользовательские сертификаты (из network_security_config)
                 val sslContext = try {
                     SSLContext.getInstance("TLS", "Conscrypt")
                 } catch (_: Exception) {
                     SSLContext.getInstance("TLS")
                 }
-                sslContext.init(null, null, SecureRandom())
                 
-                // Получаем системный TrustManager (учитывает user certificates из network_security_config)
-                val tmf = javax.net.ssl.TrustManagerFactory.getInstance(
-                    javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm()
-                )
-                tmf.init(null as java.security.KeyStore?)
-                val systemTrustManager = tmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
+                // Создаём TrustManager который доверяет и системным, и пользовательским сертификатам
+                val systemTrustManager = createSystemTrustManager()
+                sslContext.init(null, arrayOf(systemTrustManager), SecureRandom())
                 
-                if (systemTrustManager != null) {
-                    builder.sslSocketFactory(TlsSocketFactory(sslContext.socketFactory), systemTrustManager)
-                }
+                builder.sslSocketFactory(TlsSocketFactory(sslContext.socketFactory), systemTrustManager)
             }
         } catch (_: Exception) {
             // Если вся настройка SSL упала - OkHttp использует свои дефолты
@@ -290,6 +285,65 @@ class EasClient(
             override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
             override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
             override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+        }
+    }
+    
+    /**
+     * Создаёт TrustManager который доверяет системным и пользовательским сертификатам
+     * Пользовательские сертификаты - это те, что установлены через Настройки Android
+     */
+    private fun createSystemTrustManager(): X509TrustManager {
+        // Получаем системный TrustManager
+        val systemTmf = javax.net.ssl.TrustManagerFactory.getInstance(
+            javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm()
+        )
+        systemTmf.init(null as java.security.KeyStore?)
+        val systemTm = systemTmf.trustManagers
+            .filterIsInstance<X509TrustManager>()
+            .firstOrNull()
+        
+        // Пробуем получить пользовательские сертификаты из Android KeyStore
+        val userTm: X509TrustManager? = try {
+            val userKeyStore = java.security.KeyStore.getInstance("AndroidCAStore")
+            userKeyStore.load(null, null)
+            val userTmf = javax.net.ssl.TrustManagerFactory.getInstance(
+                javax.net.ssl.TrustManagerFactory.getDefaultAlgorithm()
+            )
+            userTmf.init(userKeyStore)
+            userTmf.trustManagers.filterIsInstance<X509TrustManager>().firstOrNull()
+        } catch (_: Exception) {
+            null
+        }
+        
+        // Возвращаем комбинированный TrustManager
+        return object : X509TrustManager {
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
+                systemTm?.checkClientTrusted(chain, authType)
+            }
+            
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+                // Сначала пробуем системные сертификаты
+                try {
+                    systemTm?.checkServerTrusted(chain, authType)
+                    return
+                } catch (_: Exception) {}
+                
+                // Потом пробуем пользовательские (AndroidCAStore)
+                try {
+                    userTm?.checkServerTrusted(chain, authType)
+                    return
+                } catch (_: Exception) {}
+                
+                // Если оба не сработали - бросаем исключение
+                throw java.security.cert.CertificateException("Trust anchor for certification path not found.")
+            }
+            
+            override fun getAcceptedIssuers(): Array<X509Certificate> {
+                val issuers = mutableListOf<X509Certificate>()
+                systemTm?.acceptedIssuers?.let { issuers.addAll(it) }
+                userTm?.acceptedIssuers?.let { issuers.addAll(it) }
+                return issuers.toTypedArray()
+            }
         }
     }
     

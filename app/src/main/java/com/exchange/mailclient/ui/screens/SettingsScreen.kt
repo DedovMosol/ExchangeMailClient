@@ -382,21 +382,37 @@ fun SettingsScreen(
                 )
             }
             
-            // Выбор цветовой темы
+            // Выбор цветовой темы (неактивно если включены темы по дням)
             item {
                 val currentTheme = AppColorTheme.fromCode(colorThemeCode)
+                val isEnabled = !dailyThemesEnabled
                 ListItem(
-                    headlineContent = { Text(Strings.colorTheme) },
-                    supportingContent = { Text(getThemeDisplayName(currentTheme, isRu)) },
+                    headlineContent = { 
+                        Text(
+                            Strings.colorTheme,
+                            color = if (isEnabled) MaterialTheme.colorScheme.onSurface 
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        ) 
+                    },
+                    supportingContent = { 
+                        Text(
+                            if (dailyThemesEnabled) Strings.dailyThemesActive else getThemeDisplayName(currentTheme, isRu),
+                            color = if (isEnabled) MaterialTheme.colorScheme.onSurfaceVariant 
+                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        ) 
+                    },
                     leadingContent = { 
                         Box(
                             modifier = Modifier
                                 .size(24.dp)
                                 .clip(CircleShape)
-                                .background(currentTheme.gradientStart)
+                                .background(
+                                    if (isEnabled) currentTheme.gradientStart 
+                                    else currentTheme.gradientStart.copy(alpha = 0.38f)
+                                )
                         )
                     },
-                    modifier = Modifier.clickable { showColorThemeDialog = true }
+                    modifier = if (isEnabled) Modifier.clickable { showColorThemeDialog = true } else Modifier
                 )
             }
             
@@ -516,8 +532,8 @@ fun SettingsScreen(
             
             item {
                 ListItem(
-                    headlineContent = { Text("iwo Mail Client") },
-                    supportingContent = { Text("${Strings.version} 1.0.6c") },
+                    headlineContent = { Text("Exchange Mail Client") },
+                    supportingContent = { Text("${Strings.version} 1.0.7") },
                     leadingContent = { Icon(Icons.Default.Info, null) }
                 )
             }
@@ -820,37 +836,41 @@ private fun DayThemeRow(
             .fillMaxWidth()
             .clickable { expanded = true }
             .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // Название дня - фиксированная ширина
         Text(
             text = dayName,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.width(110.dp)
         )
         
-        Row(
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .clip(CircleShape)
-                    .background(currentTheme.gradientStart)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = getThemeDisplayName(currentTheme, isRu),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Icon(
-                Icons.Default.ArrowDropDown,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        Spacer(modifier = Modifier.weight(1f))
+        
+        // Кружок с цветом - выровнен по правому краю
+        Box(
+            modifier = Modifier
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(currentTheme.gradientStart)
+        )
+        
+        // Название темы - фиксированная ширина для выравнивания
+        Text(
+            text = getThemeDisplayName(currentTheme, isRu),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .width(100.dp)
+                .padding(start = 8.dp)
+        )
+        
+        Icon(
+            Icons.Default.ArrowDropDown,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         
         DropdownMenu(
             expanded = expanded,

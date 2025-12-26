@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <!-- Разрешаем cleartext для всех соединений (для совместимости со старыми серверами) -->
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
-            <certificates src="system" />
-            <!-- Для самоподписанных сертификатов Exchange -->
-            <certificates src="user" />
+            <!-- Доверять системным сертификатам -->
+            <certificates src="system"/>
+            <!-- Доверять пользовательским сертификатам (установленным вручную) -->
+            <certificates src="user"/>
         </trust-anchors>
     </base-config>
 </network-security-config>

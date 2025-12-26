@@ -133,8 +133,8 @@ fun MainScreen(
         isSyncing = true
         
         try {
-            // Таймаут на всю синхронизацию - 60 секунд
-            kotlinx.coroutines.withTimeoutOrNull(60_000L) {
+            // Таймаут на всю синхронизацию - 5 минут (для больших ящиков)
+            kotlinx.coroutines.withTimeoutOrNull(300_000L) {
                 // Синхронизируем папки
                 withContext(Dispatchers.IO) { mailRepo.syncFolders(account.id) }
                 
@@ -156,8 +156,8 @@ fun MainScreen(
                         foldersToSync.map { folder ->
                             launch {
                                 try {
-                                    // Таймаут на каждую папку - 30 секунд
-                                    kotlinx.coroutines.withTimeoutOrNull(30_000L) {
+                                    // Таймаут на каждую папку - 2 минуты (для больших папок)
+                                    kotlinx.coroutines.withTimeoutOrNull(120_000L) {
                                         mailRepo.syncEmails(account.id, folder.id)
                                     }
                                 } catch (_: Exception) { }

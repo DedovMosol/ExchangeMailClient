@@ -122,7 +122,7 @@ object Strings {
         else "Checks on interval, saves battery"
     
     // Ночной режим
-    val nightMode: String @Composable get() = if (isRussian()) "Экономия ночью" else "Night saving"
+    val nightMode: String @Composable get() = if (isRussian()) "Ночной режим" else "Night mode"
     val nightModeDesc: String @Composable get() = if (isRussian()) 
         "23:00-7:00 синхронизация каждые 60 мин" 
         else "23:00-7:00 sync every 60 min"
@@ -435,6 +435,7 @@ object Strings {
     // Темы по дням недели
     val dailyThemes: String @Composable get() = if (isRussian()) "Темы по дням недели" else "Daily themes"
     val dailyThemesDesc: String @Composable get() = if (isRussian()) "Разные цвета для каждого дня" else "Different colors for each day"
+    val dailyThemesActive: String @Composable get() = if (isRussian()) "Активны темы по дням" else "Daily themes active"
     val configureDailyThemes: String @Composable get() = if (isRussian()) "Настроить темы по дням" else "Configure daily themes"
     val monday: String @Composable get() = if (isRussian()) "Понедельник" else "Monday"
     val tuesday: String @Composable get() = if (isRussian()) "Вторник" else "Tuesday"

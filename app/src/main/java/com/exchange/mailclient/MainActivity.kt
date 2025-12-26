@@ -23,7 +23,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import com.exchange.mailclient.data.repository.SettingsRepository
@@ -57,7 +59,7 @@ private fun PermissionDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
                 
-                // Разбиваем текст на абзацы и добавляем отступ красной строки
+                // Разбиваем текст на абзацы с красной строкой
                 Column(
                     modifier = Modifier.padding(top = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -65,8 +67,10 @@ private fun PermissionDialog(
                     text.split("\n\n").forEach { paragraph ->
                         if (paragraph.isNotBlank()) {
                             Text(
-                                text = "      $paragraph", // Абзацный отступ
-                                style = MaterialTheme.typography.bodyMedium,
+                                text = paragraph,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    textIndent = TextIndent(firstLine = 24.sp)
+                                ),
                                 textAlign = TextAlign.Justify
                             )
                         }

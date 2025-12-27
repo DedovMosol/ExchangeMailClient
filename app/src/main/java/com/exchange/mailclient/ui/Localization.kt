@@ -114,6 +114,10 @@ object Strings {
     val animations: String @Composable get() = if (isRussian()) "Анимации" else "Animations"
     val animationsDesc: String @Composable get() = if (isRussian()) "Анимированные элементы интерфейса" else "Animated UI elements"
     
+    // Персонализация интерфейса
+    val interfacePersonalization: String @Composable get() = if (isRussian()) "Персонализация интерфейса" else "Interface personalization"
+    val interfacePersonalizationDesc: String @Composable get() = if (isRussian()) "Язык, темы, шрифты, анимации" else "Language, themes, fonts, animations"
+    
     // Дни недели
     val monday: String @Composable get() = if (isRussian()) "Понедельник" else "Monday"
     val tuesday: String @Composable get() = if (isRussian()) "Вторник" else "Tuesday"
@@ -161,11 +165,8 @@ object Strings {
     
     // Режим экономии батареи
     val batterySaverMode: String @Composable get() = if (isRussian()) "Режим экономии батареи" else "Battery saver mode"
-    val batterySaverActive: String @Composable get() = if (isRussian()) "Синхронизация реже (экономия батареи)" else "Sync less often (battery saver)"
-    val ignoreBatterySaver: String @Composable get() = if (isRussian()) "Частая синхронизация" else "Frequent sync"
-    val ignoreBatterySaverDesc: String @Composable get() = if (isRussian()) 
-        "Синхронизировать с обычной частотой даже в режиме экономии" 
-        else "Sync at normal rate even in battery saver mode"
+    val batterySaverActive: String @Composable get() = if (isRussian()) "Экономия батареи" else "Battery saver"
+    val ignoreBatterySaver: String @Composable get() = if (isRussian()) "Игнорировать режим экономии при синхронизации" else "Ignore battery saver when syncing"
     
     // Интервалы синхронизации
     val syncOff: String @Composable get() = if (isRussian()) "Выключено" else "Off"
@@ -248,7 +249,6 @@ object Strings {
     val send: String @Composable get() = if (isRussian()) "Отправить" else "Send"
     val sending: String @Composable get() = if (isRussian()) "Отправка..." else "Sending..."
     val sent_success: String @Composable get() = if (isRussian()) "Письмо отправлено" else "Email sent"
-    val saveDraft: String @Composable get() = if (isRussian()) "Сохранить черновик" else "Save draft"
     val discard: String @Composable get() = if (isRussian()) "Отменить" else "Discard"
     val discardDraft: String @Composable get() = if (isRussian()) "Отменить черновик?" else "Discard draft?"
     val discardDraftConfirm: String @Composable get() = if (isRussian()) 
@@ -298,7 +298,7 @@ object Strings {
     val developerLabel: String @Composable get() = if (isRussian()) "Разработчик:" else "Developer:"
     
     // Советы по работе с приложением
-    val tipsTitle: String @Composable get() = if (isRussian()) "💡 Полезно знать" else "💡 Good to know"
+    val tipsTitle: String @Composable get() = if (isRussian()) "Советы" else "Tips"
     val tipNotification: String @Composable get() = if (isRussian()) 
         "Уведомление «Ожидание писем» нельзя убрать — это требование Android для фоновой работы (только в режиме Push)."
         else "The «Waiting for emails» notification cannot be removed — it's an Android requirement (Push mode only)."
@@ -435,8 +435,11 @@ object Strings {
     // ComposeScreen
     val scheduleSend: String @Composable get() = if (isRussian()) "Запланировать отправку" else "Schedule send"
     val doNotSave: String @Composable get() = if (isRussian()) "Не сохранять" else "Don't save"
-    val discardDraftQuestion: String @Composable get() = if (isRussian()) "Удалить черновик?" else "Discard draft?"
-    val draftWillBeDeleted: String @Composable get() = if (isRussian()) "Письмо будет удалено без сохранения" else "Email will be deleted without saving"
+    val saveDraft: String @Composable get() = if (isRussian()) "Сохранить" else "Save"
+    val draftSaved: String @Composable get() = if (isRussian()) "Черновик сохранён" else "Draft saved"
+    val draftSaveError: String @Composable get() = if (isRussian()) "Ошибка сохранения черновика" else "Draft save error"
+    val discardDraftQuestion: String @Composable get() = if (isRussian()) "Сохранить черновик?" else "Save draft?"
+    val draftWillBeDeleted: String @Composable get() = if (isRussian()) "Сохранить письмо в черновики?" else "Save email to drafts?"
     val selectSender: String @Composable get() = if (isRussian()) "Выберите отправителя" else "Select sender"
     val attach: String @Composable get() = if (isRussian()) "Прикрепить" else "Attach"
     val showCopy: String @Composable get() = if (isRussian()) "Показать копию" else "Show Cc/Bcc"
@@ -445,6 +448,9 @@ object Strings {
     val attachmentsCount: String @Composable get() = if (isRussian()) "Вложения" else "Attachments"
     val selectAccount: String @Composable get() = if (isRussian()) "Выбрать аккаунт" else "Select account"
     val sendScheduled: String @Composable get() = if (isRussian()) "Отправка запланирована" else "Send scheduled"
+    val localDraftsNotice: String @Composable get() = if (isRussian()) 
+        "Черновики сохраняются только на этом устройстве" 
+        else "Drafts are saved only on this device"
     val authError: String @Composable get() = if (isRussian()) "Ошибка авторизации" else "Authorization error"
     
     // ScheduleSendDialog
@@ -502,6 +508,7 @@ object Strings {
     val writeEmail: String @Composable get() = if (isRussian()) "Написать письмо" else "Write email"
     val copyEmail: String @Composable get() = if (isRussian()) "Копировать email" else "Copy email"
     val callPhone: String @Composable get() = if (isRussian()) "Позвонить" else "Call"
+    val addToContacts: String @Composable get() = if (isRussian()) "Добавить в контакты" else "Add to contacts"
     val exportContacts: String @Composable get() = if (isRussian()) "Экспорт контактов" else "Export contacts"
     val importContacts: String @Composable get() = if (isRussian()) "Импорт контактов" else "Import contacts"
     val exportToVCard: String @Composable get() = if (isRussian()) "Экспорт в vCard (.vcf)" else "Export to vCard (.vcf)"

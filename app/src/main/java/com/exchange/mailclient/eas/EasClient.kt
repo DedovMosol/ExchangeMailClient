@@ -1479,6 +1479,128 @@ class EasClient(
     }
     
     /**
+     * Сохранение черновика в папку Drafts через Sync Add
+     * Использует формат Email namespace для Exchange 2007+
+     * 
+     * ВАЖНО: EAS официально НЕ поддерживает Sync Add для Email!
+     * Эта функция оставлена для экспериментов - некоторые серверы могут принять.
+     * В текущей версии приложения черновики сохраняются только локально.
+     */
+    @Suppress("unused")
+    suspend fun saveDraft(
+        draftsFolderId: String,
+        syncKey: String,
+        to: String,
+        subject: String,
+        body: String,
+        cc: String = ""
+    ): EasResult<String> {
+        // Сначала получаем актуальный SyncKey если передан "0"
+        var currentSyncKey = syncKey
+        if (currentSyncKey == "0" || currentSyncKey.isEmpty()) {
+            val initXml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Sync xmlns="AirSync">
+                    <Collections>
+                        <Collection>
+                            <SyncKey>0</SyncKey>
+                            <CollectionId>$draftsFolderId</CollectionId>
+                        </Collection>
+                    </Collections>
+                </Sync>
+            """.trimIndent()
+            
+            val initResult = executeEasCommand("Sync", initXml) { responseXml ->
+                extractValue(responseXml, "SyncKey") ?: "0"
+            }
+            
+            when (initResult) {
+                is EasResult.Success -> currentSyncKey = initResult.data
+                is EasResult.Error -> return EasResult.Error("Не удалось получить SyncKey: ${initResult.message}")
+            }
+            
+            if (currentSyncKey == "0") {
+                return EasResult.Error("Не удалось инициализировать синхронизацию папки черновиков")
+            }
+        }
+        
+        val clientId = "draft_${System.currentTimeMillis()}"
+        
+        // Формируем дату в формате ISO 8601
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US)
+        dateFormat.timeZone = java.util.TimeZone.getTimeZone("UTC")
+        val dateReceived = dateFormat.format(java.util.Date())
+        
+        // Экранируем XML спецсимволы
+        val escapedTo = escapeXml(to)
+        val escapedCc = escapeXml(cc)
+        val escapedSubject = escapeXml(subject)
+        val escapedBody = escapeXml(body)
+        
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Sync xmlns="AirSync" xmlns:email="Email" xmlns:airsyncbase="AirSyncBase">
+                <Collections>
+                    <Collection>
+                        <SyncKey>$currentSyncKey</SyncKey>
+                        <CollectionId>$draftsFolderId</CollectionId>
+                        <Commands>
+                            <Add>
+                                <ClientId>$clientId</ClientId>
+                                <ApplicationData>
+                                    <email:To>$escapedTo</email:To>
+                                    <email:Cc>$escapedCc</email:Cc>
+                                    <email:Subject>$escapedSubject</email:Subject>
+                                    <email:DateReceived>$dateReceived</email:DateReceived>
+                                    <email:Read>1</email:Read>
+                                    <email:Flag/>
+                                    <airsyncbase:Body>
+                                        <airsyncbase:Type>1</airsyncbase:Type>
+                                        <airsyncbase:Data>$escapedBody</airsyncbase:Data>
+                                    </airsyncbase:Body>
+                                </ApplicationData>
+                            </Add>
+                        </Commands>
+                    </Collection>
+                </Collections>
+            </Sync>
+        """.trimIndent()
+        
+        return executeEasCommand("Sync", xml) { responseXml ->
+            val status = extractValue(responseXml, "Status")?.toIntOrNull() ?: 0
+            val newSyncKey = extractValue(responseXml, "SyncKey") ?: currentSyncKey
+            
+            if (status == 1) {
+                newSyncKey
+            } else {
+                val errorMsg = when (status) {
+                    3 -> "Неверный SyncKey, попробуйте ещё раз"
+                    4 -> "Ошибка протокола"
+                    5 -> "Ошибка сервера"
+                    6 -> "Ошибка клиента"
+                    7 -> "Конфликт"
+                    8 -> "Объект не найден"
+                    9 -> "Нет места"
+                    else -> "Ошибка сохранения черновика: status=$status"
+                }
+                throw Exception(errorMsg)
+            }
+        }
+    }
+    
+    /**
+     * Экранирует XML спецсимволы
+     */
+    private fun escapeXml(text: String): String {
+        return text
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;")
+    }
+    
+    /**
      * Отправка отчёта о прочтении (MDN - Message Disposition Notification)
      * @param to email получателя отчёта (из заголовка Disposition-Notification-To)
      * @param originalSubject тема оригинального письма

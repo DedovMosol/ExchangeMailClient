@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.1.2 (28.12.2025)
+
+### New Features
+- Interface personalization screen
+- Save drafts to server
+
+### Bug Fixes
+- Contact export (FileProvider)
+- Test email on verification deleted automatically
+- Dialog buttons — vertical layout
+- Contacts folder hidden from list
+- GAL search when returning to contacts screen
+- Back swipe in compose shows save dialog
+- Focus preserved on screen rotation
+
+### Improvements
+- Dialogs — compact design, animations
+- Sync time — date+time format, only after completion
+- Updated "Tips" section
+---
+
 ## v1.1.1 (27.12.2025)
 
 ### Bug Fixes

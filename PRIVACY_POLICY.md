@@ -1,6 +1,6 @@
 # Privacy Policy / Политика конфиденциальности
 
-**Last updated / Последнее обновление:** December 25, 2025
+**Last updated / Последнее обновление:** December 28, 2025
 
 ---
 
@@ -21,6 +21,8 @@ The App operates entirely on your device. All your data remains on your device a
 The following data is stored only on your device:
 - Email account credentials (encrypted)
 - Email messages and attachments (cached locally)
+- Contacts (personal and from corporate address book)
+- Server certificates (if configured)
 - App settings and preferences
 - Sync history
 
@@ -75,6 +77,8 @@ iwo Mail Client ("Приложение") разработано DedovMosol. На
 На вашем устройстве хранятся только:
 - Учётные данные почтовых аккаунтов (в зашифрованном виде)
 - Письма и вложения (локальный кэш)
+- Контакты (личные и из корпоративной адресной книги)
+- Сертификаты серверов (если настроены)
 - Настройки приложения
 - История синхронизации
 

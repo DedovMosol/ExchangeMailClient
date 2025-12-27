@@ -32,7 +32,6 @@ import com.exchange.mailclient.ui.LocalLanguage
 import com.exchange.mailclient.ui.Strings
 import com.exchange.mailclient.ui.isRussian
 import com.exchange.mailclient.ui.theme.LocalColorTheme
-import com.exchange.mailclient.ui.theme.LocalColorTheme
 import com.exchange.mailclient.ui.theme.AppColorTheme
 import kotlinx.coroutines.launch
 
@@ -41,7 +40,8 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     onBackClick: () -> Unit,
     onEditAccount: (Long) -> Unit,
-    onAddAccount: () -> Unit = {}
+    onAddAccount: () -> Unit = {},
+    onNavigateToPersonalization: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -61,212 +61,40 @@ fun SettingsScreen(
     // Проверяем активен ли Battery Saver
     val isBatterySaverActive = remember { settingsRepo.isBatterySaverActive() }
     
-    // Настройки языка
-    val currentLanguage = LocalLanguage.current
-    var showLanguageDialog by remember { mutableStateOf(false) }
-    
-    // Настройки размера шрифта
-    val fontSize by settingsRepo.fontSize.collectAsState(initial = SettingsRepository.FontSize.MEDIUM)
-    var showFontSizeDialog by remember { mutableStateOf(false) }
-    
-    // Настройки цветовой темы
-    val colorThemeCode by settingsRepo.colorTheme.collectAsState(initial = "purple")
-    val dailyThemesEnabled by settingsRepo.dailyThemesEnabled.collectAsState(initial = false)
-    val animationsEnabled by settingsRepo.animationsEnabled.collectAsState(initial = true)
-    var showColorThemeDialog by remember { mutableStateOf(false) }
-    var showDailyThemesDialog by remember { mutableStateOf(false) }
-    
-    // Темы по дням недели
-    val mondayTheme by settingsRepo.getDayTheme(java.util.Calendar.MONDAY).collectAsState(initial = "purple")
-    val tuesdayTheme by settingsRepo.getDayTheme(java.util.Calendar.TUESDAY).collectAsState(initial = "blue")
-    val wednesdayTheme by settingsRepo.getDayTheme(java.util.Calendar.WEDNESDAY).collectAsState(initial = "green")
-    val thursdayTheme by settingsRepo.getDayTheme(java.util.Calendar.THURSDAY).collectAsState(initial = "orange")
-    val fridayTheme by settingsRepo.getDayTheme(java.util.Calendar.FRIDAY).collectAsState(initial = "red")
-    val saturdayTheme by settingsRepo.getDayTheme(java.util.Calendar.SATURDAY).collectAsState(initial = "pink")
-    val sundayTheme by settingsRepo.getDayTheme(java.util.Calendar.SUNDAY).collectAsState(initial = "yellow")
-    
-    // Диалог выбора размера шрифта
-    if (showFontSizeDialog) {
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
-            onDismissRequest = { showFontSizeDialog = false },
-            title = { Text(Strings.selectFontSize) },
-            text = {
-                Column {
-                    SettingsRepository.FontSize.entries.forEach { size ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    scope.launch {
-                                        settingsRepo.setFontSize(size)
-                                    }
-                                    showFontSizeDialog = false
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = fontSize == size,
-                                onClick = null
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(size.getDisplayName(isRu))
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showFontSizeDialog = false }) {
-                    Text(Strings.cancel)
-                }
-            }
-        )
-    }
-    
-    // Диалог выбора цветовой темы
-    if (showColorThemeDialog) {
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
-            onDismissRequest = { showColorThemeDialog = false },
-            title = { Text(Strings.selectColorTheme) },
-            text = {
-                Column {
-                    AppColorTheme.entries.forEach { theme ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    scope.launch {
-                                        settingsRepo.setColorTheme(theme.code)
-                                    }
-                                    showColorThemeDialog = false
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = colorThemeCode == theme.code,
-                                onClick = null
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(CircleShape)
-                                    .background(theme.gradientStart)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(getThemeDisplayName(theme, isRu))
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showColorThemeDialog = false }) {
-                    Text(Strings.cancel)
-                }
-            }
-        )
-    }
-    
-    // Диалог настройки тем по дням недели
-    if (showDailyThemesDialog) {
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
-            onDismissRequest = { showDailyThemesDialog = false },
-            title = { Text(Strings.configureDailyThemes) },
-            text = {
-                Column {
-                    DayThemeRow(Strings.monday, mondayTheme, isRu) { theme ->
-                        scope.launch { settingsRepo.setDayTheme(java.util.Calendar.MONDAY, theme) }
-                    }
-                    DayThemeRow(Strings.tuesday, tuesdayTheme, isRu) { theme ->
-                        scope.launch { settingsRepo.setDayTheme(java.util.Calendar.TUESDAY, theme) }
-                    }
-                    DayThemeRow(Strings.wednesday, wednesdayTheme, isRu) { theme ->
-                        scope.launch { settingsRepo.setDayTheme(java.util.Calendar.WEDNESDAY, theme) }
-                    }
-                    DayThemeRow(Strings.thursday, thursdayTheme, isRu) { theme ->
-                        scope.launch { settingsRepo.setDayTheme(java.util.Calendar.THURSDAY, theme) }
-                    }
-                    DayThemeRow(Strings.friday, fridayTheme, isRu) { theme ->
-                        scope.launch { settingsRepo.setDayTheme(java.util.Calendar.FRIDAY, theme) }
-                    }
-                    DayThemeRow(Strings.saturday, saturdayTheme, isRu) { theme ->
-                        scope.launch { settingsRepo.setDayTheme(java.util.Calendar.SATURDAY, theme) }
-                    }
-                    DayThemeRow(Strings.sunday, sundayTheme, isRu) { theme ->
-                        scope.launch { settingsRepo.setDayTheme(java.util.Calendar.SUNDAY, theme) }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showDailyThemesDialog = false }) {
-                    Text(Strings.done)
-                }
-            }
-        )
-    }
-    
-    // Диалог выбора языка
-    if (showLanguageDialog) {
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
-            onDismissRequest = { showLanguageDialog = false },
-            title = { Text(Strings.selectLanguage) },
-            text = {
-                Column {
-                    AppLanguage.entries.forEach { lang ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    scope.launch {
-                                        settingsRepo.setLanguage(lang.code)
-                                    }
-                                    showLanguageDialog = false
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            RadioButton(
-                                selected = currentLanguage == lang,
-                                onClick = null
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(lang.displayName)
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showLanguageDialog = false }) {
-                    Text(Strings.cancel)
-                }
-            }
-        )
-    }
-    
     // Диалог подтверждения удаления
     accountToDelete?.let { account ->
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
+        com.exchange.mailclient.ui.theme.StyledAlertDialog(
             onDismissRequest = { accountToDelete = null },
+            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
             title = { Text(Strings.deleteAccount) },
-            text = { Text("${account.displayName}: ${Strings.deleteAccountConfirm}") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        scope.launch {
-                            accountRepo.deleteAccount(account.id)
-                            accountToDelete = null
+            text = { 
+                Column {
+                    Text("${account.displayName}: ${Strings.deleteAccountConfirm}")
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Кнопки в разных сторонах
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { accountToDelete = null }) {
+                            Text(Strings.cancel)
+                        }
+                        TextButton(
+                            onClick = {
+                                scope.launch {
+                                    accountRepo.deleteAccount(account.id)
+                                    accountToDelete = null
+                                }
+                            }
+                        ) {
+                            Text(Strings.delete, color = MaterialTheme.colorScheme.error)
                         }
                     }
-                ) {
-                    Text(Strings.delete, color = MaterialTheme.colorScheme.error)
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { accountToDelete = null }) {
-                    Text(Strings.cancel)
-                }
-            }
+            confirmButton = {}
         )
     }
     
@@ -376,106 +204,16 @@ fun SettingsScreen(
                 )
             }
             
-            // Выбор языка
+            // Персонализация интерфейса - открывает отдельный экран
             item {
                 ListItem(
-                    headlineContent = { Text(Strings.language) },
-                    supportingContent = { Text(currentLanguage.displayName) },
-                    leadingContent = { Icon(Icons.Default.Language, null) },
-                    modifier = Modifier.clickable { showLanguageDialog = true }
-                )
-            }
-            
-            // Выбор размера шрифта
-            item {
-                ListItem(
-                    headlineContent = { Text(Strings.fontSize) },
-                    supportingContent = { Text(fontSize.getDisplayName(isRu)) },
-                    leadingContent = { Icon(Icons.Default.TextFields, null) },
-                    modifier = Modifier.clickable { showFontSizeDialog = true }
-                )
-            }
-            
-            // Выбор цветовой темы (неактивно если включены темы по дням)
-            item {
-                val currentTheme = AppColorTheme.fromCode(colorThemeCode)
-                val isEnabled = !dailyThemesEnabled
-                ListItem(
-                    headlineContent = { 
-                        Text(
-                            Strings.colorTheme,
-                            color = if (isEnabled) MaterialTheme.colorScheme.onSurface 
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                        ) 
-                    },
-                    supportingContent = { 
-                        Text(
-                            if (dailyThemesEnabled) Strings.dailyThemesActive else getThemeDisplayName(currentTheme, isRu),
-                            color = if (isEnabled) MaterialTheme.colorScheme.onSurfaceVariant 
-                                    else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                        ) 
-                    },
-                    leadingContent = { 
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (isEnabled) currentTheme.gradientStart 
-                                    else currentTheme.gradientStart.copy(alpha = 0.38f)
-                                )
-                        )
-                    },
-                    modifier = if (isEnabled) Modifier.clickable { showColorThemeDialog = true } else Modifier
-                )
-            }
-            
-            // Темы по дням недели
-            item {
-                ListItem(
-                    headlineContent = { Text(Strings.dailyThemes) },
-                    supportingContent = { Text(Strings.dailyThemesDesc) },
-                    leadingContent = { Icon(Icons.Default.CalendarMonth, null) },
+                    headlineContent = { Text(Strings.interfacePersonalization) },
+                    supportingContent = { Text(Strings.interfacePersonalizationDesc) },
+                    leadingContent = { Icon(Icons.Default.Palette, null) },
                     trailingContent = {
-                        Switch(
-                            checked = dailyThemesEnabled,
-                            onCheckedChange = { enabled ->
-                                scope.launch {
-                                    settingsRepo.setDailyThemesEnabled(enabled)
-                                }
-                            }
-                        )
-                    }
-                )
-            }
-            
-            // Настройка тем по дням (показывается только если включено)
-            if (dailyThemesEnabled) {
-                item {
-                    ListItem(
-                        headlineContent = { Text(Strings.configureDailyThemes) },
-                        leadingContent = { Icon(Icons.Default.Settings, null) },
-                        modifier = Modifier.clickable { showDailyThemesDialog = true }
-                    )
-                }
-            }
-            
-            // Анимации интерфейса
-            item {
-                ListItem(
-                    headlineContent = { Text(Strings.animations) },
-                    supportingContent = { Text(Strings.animationsDesc) },
-                    leadingContent = { Icon(Icons.Default.Animation, null) },
-                    trailingContent = {
-                        Switch(
-                            checked = animationsEnabled,
-                            onCheckedChange = { enabled ->
-                                scope.launch {
-                                    settingsRepo.setAnimationsEnabled(enabled)
-                                }
-                            }
-                        )
-                    }
+                        Icon(Icons.Default.ChevronRight, null)
+                    },
+                    modifier = Modifier.clickable { onNavigateToPersonalization() }
                 )
             }
             
@@ -536,14 +274,6 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text(Strings.ignoreBatterySaver) },
-                    supportingContent = { 
-                        Text(
-                            if (isBatterySaverActive && !ignoreBatterySaver) 
-                                Strings.batterySaverActive 
-                            else 
-                                Strings.ignoreBatterySaverDesc
-                        ) 
-                    },
                     leadingContent = { Icon(Icons.Default.BatterySaver, null) },
                     trailingContent = {
                         Switch(
@@ -644,7 +374,7 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("Exchange Mail Client") },
-                    supportingContent = { Text("${Strings.version} 1.1.1") },
+                    supportingContent = { Text("${Strings.version} 1.1.2") },
                     leadingContent = { Icon(Icons.Default.Info, null) }
                 )
             }
@@ -989,34 +719,43 @@ private fun AccountSettingsItem(
             onDismissRequest = { showSignatureDialog = false },
             title = { Text(Strings.editSignature) },
             text = {
-                OutlinedTextField(
-                    value = signatureText,
-                    onValueChange = { signatureText = it },
-                    label = { Text(Strings.signatureHint) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 120.dp),
-                    maxLines = 6
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onSignatureChange(signatureText)
-                        showSignatureDialog = false
+                Column {
+                    OutlinedTextField(
+                        value = signatureText,
+                        onValueChange = { signatureText = it },
+                        label = { Text(Strings.signatureHint) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp),
+                        maxLines = 6
+                    )
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Кнопки в разных сторонах
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = { 
+                            signatureText = account.signature
+                            showSignatureDialog = false 
+                        }) {
+                            Text(Strings.cancel)
+                        }
+                        TextButton(
+                            onClick = {
+                                onSignatureChange(signatureText)
+                                showSignatureDialog = false
+                            }
+                        ) {
+                            Text(Strings.save)
+                        }
                     }
-                ) {
-                    Text(Strings.save)
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { 
-                    signatureText = account.signature
-                    showSignatureDialog = false 
-                }) {
-                    Text(Strings.cancel)
-                }
-            }
+            confirmButton = {},
+            dismissButton = {}
         )
     }
     
@@ -1081,7 +820,7 @@ private fun AccountSettingsItem(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(LocalColorTheme.current.gradientStart),
+                            .background(Color(account.color)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

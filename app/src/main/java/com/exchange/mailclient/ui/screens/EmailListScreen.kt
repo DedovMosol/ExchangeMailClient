@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
@@ -179,6 +180,7 @@ fun EmailListScreen(
     // Определяем тип папки
     val isSpamFolder = folder?.type == 11 // type 11 = Spam/Junk
     val isTrashFolder = folder?.type == 4 // type 4 = Deleted Items
+    val isDraftsFolder = folder?.type == 3 // type 3 = Drafts
     
     // Фильтры - используем initialFilter как начальное значение
     var showFilters by rememberSaveable { mutableStateOf(initialFilter != MailFilter.ALL) }
@@ -693,6 +695,7 @@ fun EmailListScreen(
                 errorMessage = errorMessage,
                 isFavorites = isFavorites,
                 isTrashOrSpam = isTrashFolder || isSpamFolder,
+                isDrafts = isDraftsFolder,
                 onEmailClick = { email ->
                     if (isSelectionMode) {
                         selectedIds = if (email.id in selectedIds) selectedIds - email.id else selectedIds + email.id
@@ -950,6 +953,7 @@ private fun EmailList(
     errorMessage: String?,
     isFavorites: Boolean,
     isTrashOrSpam: Boolean = false,
+    isDrafts: Boolean = false,
     onEmailClick: (EmailEntity) -> Unit,
     onLongClick: (EmailEntity) -> Unit,
     onStarClick: (EmailEntity) -> Unit,
@@ -991,6 +995,7 @@ private fun EmailList(
                         selectedIds = selectedIds,
                         isSelectionMode = isSelectionMode,
                         isTrashOrSpam = isTrashOrSpam,
+                        isDrafts = isDrafts,
                         listState = listState,
                         errorMessage = errorMessage,
                         onEmailClick = onEmailClick,
@@ -1152,6 +1157,7 @@ private fun EmailListContent(
     selectedIds: Set<String>,
     isSelectionMode: Boolean,
     isTrashOrSpam: Boolean,
+    isDrafts: Boolean = false,
     listState: androidx.compose.foundation.lazy.LazyListState,
     errorMessage: String?,
     onEmailClick: (EmailEntity) -> Unit,
@@ -1187,6 +1193,33 @@ private fun EmailListContent(
     }
     
     LazyColumn(state = listState) {
+        // Уведомление для папки Черновики - компактный баннер
+        if (isDrafts) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        Icons.Default.PhoneAndroid,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = Strings.localDraftsNotice,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+        
         if (isSelectionMode) {
             item {
                 Row(

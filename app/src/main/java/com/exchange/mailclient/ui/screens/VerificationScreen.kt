@@ -462,18 +462,60 @@ private suspend fun verifyEmail(
     // Ждём пока письмо дойдёт
     delay(3000)
     
-    // Проверяем "From" в отправленных
+    // Проверяем "From" в отправленных и запоминаем serverId для удаления
+    var testEmailServerId: String? = null
+    var testEmailSyncKey: String? = null
+    
     if (sentFolder != null) {
-        val sentResult = client.fetchOneEmailForVerification(sentFolder.serverId)
-        if (sentResult is EasResult.Success && sentResult.data != null) {
-            val sentEmail = sentResult.data
-            val fromEmail = extractEmailFromString(sentEmail.from)
+        // Получаем syncKey для папки Отправленные
+        val syncResult = client.sync(sentFolder.serverId, "0", 1)
+        if (syncResult is EasResult.Success) {
+            testEmailSyncKey = syncResult.data.syncKey
             
-            if (fromEmail.isNotEmpty() && fromEmail.contains("@")) {
-                if (emailsMatch(email, fromEmail)) {
-                    return VerificationResult.Success
-                } else {
-                    return VerificationResult.EmailMismatch(email, fromEmail)
+            // Получаем письмо
+            val sentResult2 = client.sync(sentFolder.serverId, testEmailSyncKey, 1)
+            if (sentResult2 is EasResult.Success && sentResult2.data.emails.isNotEmpty()) {
+                val sentEmail = sentResult2.data.emails.first()
+                testEmailServerId = sentEmail.serverId
+                testEmailSyncKey = sentResult2.data.syncKey
+                val fromEmail = extractEmailFromString(sentEmail.from)
+                
+                if (fromEmail.isNotEmpty() && fromEmail.contains("@")) {
+                    // Удаляем тестовое письмо из Отправленных
+                    if (testEmailServerId != null && testEmailSyncKey != null) {
+                        client.deleteEmailPermanently(sentFolder.serverId, testEmailServerId, testEmailSyncKey)
+                    }
+                    
+                    // Также удаляем из Входящих (письмо пришло самому себе)
+                    if (inboxFolder != null) {
+                        try {
+                            val inboxSync = client.sync(inboxFolder.serverId, "0", 1)
+                            if (inboxSync is EasResult.Success) {
+                                val inboxSync2 = client.sync(inboxFolder.serverId, inboxSync.data.syncKey, 5)
+                                if (inboxSync2 is EasResult.Success) {
+                                    // Ищем письмо с темой тестового письма
+                                    val testInboxEmail = inboxSync2.data.emails.find { 
+                                        it.subject == testEmailSubjectText 
+                                    }
+                                    if (testInboxEmail != null) {
+                                        client.deleteEmailPermanently(
+                                            inboxFolder.serverId, 
+                                            testInboxEmail.serverId, 
+                                            inboxSync2.data.syncKey
+                                        )
+                                    }
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // Игнорируем ошибки удаления из входящих
+                        }
+                    }
+                    
+                    if (emailsMatch(email, fromEmail)) {
+                        return VerificationResult.Success
+                    } else {
+                        return VerificationResult.EmailMismatch(email, fromEmail)
+                    }
                 }
             }
         }

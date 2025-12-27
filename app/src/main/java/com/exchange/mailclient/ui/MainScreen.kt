@@ -625,6 +625,7 @@ fun MainScreen(
                 onSyncFolders = { syncFolders() },
                 onFolderClick = onNavigateToEmailList,
                 onContactsClick = onNavigateToContacts,
+                onSettingsClick = onNavigateToSettings,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -642,6 +643,7 @@ private fun HomeContent(
     onSyncFolders: () -> Unit,
     onFolderClick: (String) -> Unit,
     onContactsClick: () -> Unit,
+    onSettingsClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -714,7 +716,9 @@ private fun HomeContent(
         if (showBatterySaverWarning) {
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSettingsClick() },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f)
                     ),
@@ -805,22 +809,20 @@ private fun HomeContent(
                                 }
                             }
                             
-                            Spacer(modifier = Modifier.height(16.dp))
-                            
-                            // Время последней синхронизации
-                            val syncTimeText = if (lastSyncTime > 0) {
-                                val formatter = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
-                                "${Strings.lastSync} ${formatter.format(java.util.Date(lastSyncTime))}"
-                            } else {
-                                Strings.neverSynced
+                            // Время последней синхронизации - показываем только когда не идёт синхронизация
+                            if (!isSyncing && !isLoading && lastSyncTime > 0) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                val formatter = java.text.SimpleDateFormat("dd.MM.yyyy HH:mm", java.util.Locale.getDefault())
+                                val syncTimeText = "${Strings.lastSync} ${formatter.format(java.util.Date(lastSyncTime))}"
+                                
+                                Text(
+                                    text = syncTimeText,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
-                            
-                            Text(
-                                text = syncTimeText,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontWeight = FontWeight.Medium
-                            )
                         }
                     }
                 }
@@ -1107,6 +1109,46 @@ private fun HomeContent(
                             .padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Анимированная лампочка
+                        val animationsEnabled = com.exchange.mailclient.ui.theme.LocalAnimationsEnabled.current
+                        
+                        val bulbScale: Float
+                        val bulbAlpha: Float
+                        
+                        if (animationsEnabled) {
+                            val infiniteTransition = rememberInfiniteTransition(label = "bulb")
+                            bulbScale = infiniteTransition.animateFloat(
+                                initialValue = 1f,
+                                targetValue = 1.15f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(800, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "bulbScale"
+                            ).value
+                            bulbAlpha = infiniteTransition.animateFloat(
+                                initialValue = 0.7f,
+                                targetValue = 1f,
+                                animationSpec = infiniteRepeatable(
+                                    animation = tween(800, easing = FastOutSlowInEasing),
+                                    repeatMode = RepeatMode.Reverse
+                                ),
+                                label = "bulbAlpha"
+                            ).value
+                        } else {
+                            bulbScale = 1f
+                            bulbAlpha = 1f
+                        }
+                        
+                        Icon(
+                            imageVector = Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            tint = Color(0xFFFFB300).copy(alpha = bulbAlpha),
+                            modifier = Modifier
+                                .size(24.dp)
+                                .scale(bulbScale)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = Strings.tipsTitle,
                             style = MaterialTheme.typography.titleSmall,
@@ -1249,7 +1291,7 @@ private fun HomeContent(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "v1.1.1",
+                                text = "v1.1.2",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1908,7 +1950,7 @@ private fun SearchTopBar(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(colorTheme.gradientStart),
+                        .background(Color(accountColor)),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -2015,8 +2057,9 @@ private fun DrawerContent(
             }
         }
         
-        // Остальные папки
-        val otherFolders = folders.filter { it.type !in mainFolderTypes }
+        // Остальные папки (кроме Contacts - type 9, у нас свой экран контактов)
+        val hiddenFolderTypes = listOf(9) // Contacts
+        val otherFolders = folders.filter { it.type !in mainFolderTypes && it.type !in hiddenFolderTypes }
         if (otherFolders.isNotEmpty()) {
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

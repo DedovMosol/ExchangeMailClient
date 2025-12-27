@@ -4,7 +4,7 @@
 
 Android mail client with Microsoft Exchange Server 2007+ (ActiveSync), IMAP and POP3 support.
 
-**Version:** 1.1.1  
+**Version:** 1.1.2  
 **Developer:** DedovMosol  
 **Telegram:** [@i_wantout](https://t.me/i_wantout)  
 **Email:** andreyid@outlook.com
@@ -39,14 +39,15 @@ Android mail client with Microsoft Exchange Server 2007+ (ActiveSync), IMAP and 
 | Background sync | ✅ |
 | Dark theme | ✅ |
 | Color themes (7 colors) | ✅ |
+| Interface personalization | ✅ |
 | Account signature | ✅ |
 | Read/delivery receipt request (MDN/DSN) | ✅ |
 
-## 🆕 What's New in v1.1.0
+## 🆕 What's New in v1.1.2
 
-- **Contact groups** — organize contacts into folders with filtering
-- **Real deletion progress** — trash cleanup shows X / Y emails
-- **Avatar color** — user avatar changes with app color theme
+- **Personalization screen** — appearance settings moved to separate screen (language, fonts, themes, animations)
+- **Improved dialogs** — compact design with appearance animation
+- **Bug fixes** — contact export, test email on verification
 
 📋 Full changelog: [CHANGELOG_EN.md](CHANGELOG_EN.md)
 

@@ -177,6 +177,7 @@ sealed class Screen(val route: String) {
         }
     }
     object Settings : Screen("settings")
+    object Personalization : Screen("personalization")
     object Search : Screen("search")
     object Contacts : Screen("contacts")
 }
@@ -536,7 +537,16 @@ fun AppNavigation(openInboxUnread: Boolean = false, openEmailId: String? = null)
                 },
                 onAddAccount = {
                     navController.navigate(Screen.Setup.createRoute())
+                },
+                onNavigateToPersonalization = {
+                    navController.navigate(Screen.Personalization.route)
                 }
+            )
+        }
+        
+        composable(Screen.Personalization.route) {
+            PersonalizationScreen(
+                onBackClick = { navController.popBackStack() }
             )
         }
         

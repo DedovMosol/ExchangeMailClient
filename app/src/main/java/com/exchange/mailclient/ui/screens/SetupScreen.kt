@@ -24,6 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -98,6 +101,30 @@ fun SetupScreen(
     
     // Поля для IMAP/POP3
     var accountType by rememberSaveable { mutableStateOf(AccountType.EXCHANGE) }
+    
+    // Сохранение фокуса при повороте экрана
+    var focusedFieldIndex by rememberSaveable { mutableIntStateOf(-1) }
+    val displayNameFocus = remember { FocusRequester() }
+    val emailFocus = remember { FocusRequester() }
+    val serverUrlFocus = remember { FocusRequester() }
+    val usernameFocus = remember { FocusRequester() }
+    val passwordFocus = remember { FocusRequester() }
+    val domainFocus = remember { FocusRequester() }
+    
+    // Восстановление фокуса после поворота
+    LaunchedEffect(focusedFieldIndex) {
+        if (focusedFieldIndex >= 0) {
+            kotlinx.coroutines.delay(100)
+            when (focusedFieldIndex) {
+                0 -> displayNameFocus.requestFocus()
+                1 -> emailFocus.requestFocus()
+                2 -> serverUrlFocus.requestFocus()
+                3 -> usernameFocus.requestFocus()
+                4 -> passwordFocus.requestFocus()
+                5 -> domainFocus.requestFocus()
+            }
+        }
+    }
     var incomingPort by rememberSaveable { mutableStateOf("443") }
     var outgoingServer by rememberSaveable { mutableStateOf("") }
     var outgoingPort by rememberSaveable { mutableStateOf("587") }
@@ -487,7 +514,10 @@ fun SetupScreen(
                 onValueChange = { displayName = it },
                 label = { Text(Strings.displayName) },
                 placeholder = { Text(if (isRussian()) "Рабочая почта" else "Work email") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(displayNameFocus)
+                    .onFocusChanged { if (it.isFocused) focusedFieldIndex = 0 },
                 singleLine = true
             )
             
@@ -496,7 +526,10 @@ fun SetupScreen(
                 onValueChange = { email = it },
                 label = { Text(Strings.email) },
                 placeholder = { Text("user@company.com") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(emailFocus)
+                    .onFocusChanged { if (it.isFocused) focusedFieldIndex = 1 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
             )
@@ -689,7 +722,10 @@ fun SetupScreen(
                         )
                     }
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(serverUrlFocus)
+                    .onFocusChanged { if (it.isFocused) focusedFieldIndex = 2 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
             )
@@ -843,7 +879,10 @@ fun SetupScreen(
                     onValueChange = { domain = it },
                     label = { Text("${Strings.domain} (${Strings.optional})") },
                     placeholder = { Text("DOMAIN") },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(domainFocus)
+                        .onFocusChanged { if (it.isFocused) focusedFieldIndex = 5 },
                     singleLine = true
                 )
             }
@@ -853,7 +892,10 @@ fun SetupScreen(
                 onValueChange = { username = it },
                 label = { Text(if (isRussian()) "Имя пользователя" else "Username") },
                 placeholder = { Text("username") },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(usernameFocus)
+                    .onFocusChanged { if (it.isFocused) focusedFieldIndex = 3 },
                 singleLine = true
             )
             
@@ -861,7 +903,10 @@ fun SetupScreen(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text(Strings.password) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(passwordFocus)
+                    .onFocusChanged { if (it.isFocused) focusedFieldIndex = 4 },
                 singleLine = true,
                 visualTransformation = if (passwordVisible) 
                     VisualTransformation.None else PasswordVisualTransformation(),

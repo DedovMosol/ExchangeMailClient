@@ -3,12 +3,14 @@ package com.exchange.mailclient.ui.screens
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.text.input.KeyboardType
@@ -19,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -111,10 +114,28 @@ fun ComposeScreen(
     val subjectFocusRequester = remember { FocusRequester() }
     val bodyFocusRequester = remember { FocusRequester() }
     
+    // Сохранение фокуса при повороте экрана
+    var focusedFieldIndex by rememberSaveable { mutableIntStateOf(-1) }
+    
+    // Восстановление фокуса после поворота
+    LaunchedEffect(focusedFieldIndex) {
+        if (focusedFieldIndex >= 0) {
+            kotlinx.coroutines.delay(100)
+            when (focusedFieldIndex) {
+                0 -> toFocusRequester.requestFocus()
+                1 -> ccFocusRequester.requestFocus()
+                2 -> bccFocusRequester.requestFocus()
+                3 -> subjectFocusRequester.requestFocus()
+                4 -> bodyFocusRequester.requestFocus()
+            }
+        }
+    }
+    
     // Меню и диалоги
     var showMenu by remember { mutableStateOf(false) }
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var isSavingDraft by remember { mutableStateOf(false) }
     
     // Автодополнение email
     val database = remember { MailDatabase.getInstance(context) }
@@ -276,6 +297,74 @@ fun ComposeScreen(
     val accountNotFoundMsg = Strings.accountNotFound
     val authErrorMsg = Strings.authError
     val sendScheduledMsg = Strings.sendScheduled
+    val draftSavedMsg = Strings.draftSaved
+    val draftSaveErrorMsg = Strings.draftSaveError
+    
+    // Функция сохранения черновика (только локально)
+    // EAS не поддерживает создание email через Sync Add
+    fun saveDraft() {
+        scope.launch {
+            isSavingDraft = true
+            
+            val account = activeAccount
+            if (account == null) {
+                Toast.makeText(context, accountNotFoundMsg, Toast.LENGTH_SHORT).show()
+                isSavingDraft = false
+                return@launch
+            }
+            
+            try {
+                // Получаем папку Drafts
+                val draftsFolder = withContext(Dispatchers.IO) {
+                    database.folderDao().getFolderByType(account.id, 3) // type 3 = Drafts
+                }
+                
+                if (draftsFolder == null) {
+                    Toast.makeText(context, draftSaveErrorMsg, Toast.LENGTH_SHORT).show()
+                    isSavingDraft = false
+                    return@launch
+                }
+                
+                // Создаём локальный черновик
+                val draftId = "draft_${account.id}_${System.currentTimeMillis()}"
+                val draftServerId = "local_draft_${System.currentTimeMillis()}"
+                
+                val draftEmail = com.exchange.mailclient.data.database.EmailEntity(
+                    id = draftId,
+                    accountId = account.id,
+                    folderId = draftsFolder.id,
+                    serverId = draftServerId,
+                    from = account.email,
+                    fromName = account.displayName,
+                    to = to,
+                    cc = cc,
+                    subject = subject.ifBlank { "(Без темы)" },
+                    preview = body.take(100),
+                    body = body,
+                    bodyType = 1,
+                    dateReceived = System.currentTimeMillis(),
+                    read = true,
+                    flagged = false,
+                    importance = 1,
+                    hasAttachments = attachments.isNotEmpty()
+                )
+                
+                withContext(Dispatchers.IO) {
+                    database.emailDao().insert(draftEmail)
+                    // Обновляем счётчик папки Черновики
+                    val newCount = database.emailDao().getCountByFolder(draftsFolder.id)
+                    database.folderDao().updateTotalCount(draftsFolder.id, newCount)
+                }
+                
+                Toast.makeText(context, draftSavedMsg, Toast.LENGTH_SHORT).show()
+                onBackClick()
+            } catch (e: Exception) {
+                Toast.makeText(context, "${draftSaveErrorMsg}: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+            
+            isSavingDraft = false
+        }
+    }
     
     fun sendEmail(scheduledTime: Long? = null) {
         scope.launch {
@@ -350,23 +439,36 @@ fun ComposeScreen(
         }
     }
     
-    // Диалог подтверждения удаления
+    // Диалог подтверждения выхода — сохранить или нет
     if (showDiscardDialog) {
         com.exchange.mailclient.ui.theme.ScaledAlertDialog(
             onDismissRequest = { showDiscardDialog = false },
             title = { Text(Strings.discardDraftQuestion) },
             text = { Text(Strings.draftWillBeDeleted) },
             confirmButton = {
-                TextButton(onClick = { 
-                    showDiscardDialog = false
-                    onBackClick()
-                }) {
-                    Text(Strings.delete)
+                TextButton(
+                    onClick = { 
+                        showDiscardDialog = false
+                        saveDraft()
+                    },
+                    enabled = !isSavingDraft
+                ) {
+                    if (isSavingDraft) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text(Strings.saveDraft)
+                    }
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) {
-                    Text(Strings.cancel)
+                TextButton(
+                    onClick = { 
+                        showDiscardDialog = false
+                        onBackClick()
+                    },
+                    enabled = !isSavingDraft
+                ) {
+                    Text(Strings.doNotSave, color = MaterialTheme.colorScheme.error)
                 }
             }
         )
@@ -401,14 +503,20 @@ fun ComposeScreen(
                                 .padding(vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.AccountCircle,
-                                null,
-                                tint = if (account.id == activeAccount?.id) 
-                                    MaterialTheme.colorScheme.primary 
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(32.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(account.color)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = account.displayName.firstOrNull()?.uppercase() ?: "?",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
@@ -441,12 +549,30 @@ fun ComposeScreen(
         )
     }
     
+    // Перехват системного жеста "назад" (свайп)
+    BackHandler {
+        val hasContent = to.isNotBlank() || subject.isNotBlank() || body.isNotBlank() || attachments.isNotEmpty()
+        if (hasContent) {
+            showDiscardDialog = true
+        } else {
+            onBackClick()
+        }
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) {
+                    IconButton(onClick = {
+                        // Если есть контент — показываем диалог
+                        val hasContent = to.isNotBlank() || subject.isNotBlank() || body.isNotBlank() || attachments.isNotEmpty()
+                        if (hasContent) {
+                            showDiscardDialog = true
+                        } else {
+                            onBackClick()
+                        }
+                    }) {
                         Icon(Icons.Default.ArrowBack, Strings.back, tint = Color.White)
                     }
                 },
@@ -502,14 +628,6 @@ fun ComposeScreen(
                                     showScheduleDialog = true
                                 },
                                 leadingIcon = { Icon(Icons.Default.Schedule, null) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(Strings.doNotSave) },
-                                onClick = {
-                                    showMenu = false
-                                    showDiscardDialog = true
-                                },
-                                leadingIcon = { Icon(Icons.Default.Delete, null) }
                             )
                         }
                     }
@@ -579,6 +697,7 @@ fun ComposeScreen(
                             .focusRequester(toFocusRequester)
                             .onFocusChanged { focusState ->
                                 toFieldFocused = focusState.isFocused
+                                if (focusState.isFocused) focusedFieldIndex = 0
                                 if (!focusState.isFocused) {
                                     showToSuggestions = false
                                 }
@@ -672,7 +791,8 @@ fun ComposeScreen(
                         onValueChange = { cc = it },
                         modifier = Modifier
                             .weight(1f)
-                            .focusRequester(ccFocusRequester),
+                            .focusRequester(ccFocusRequester)
+                            .onFocusChanged { if (it.isFocused) focusedFieldIndex = 1 },
                         colors = TextFieldDefaults.colors(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                             focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -697,7 +817,8 @@ fun ComposeScreen(
                         onValueChange = { bcc = it },
                         modifier = Modifier
                             .weight(1f)
-                            .focusRequester(bccFocusRequester),
+                            .focusRequester(bccFocusRequester)
+                            .onFocusChanged { if (it.isFocused) focusedFieldIndex = 2 },
                         colors = TextFieldDefaults.colors(
                             unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                             focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -718,7 +839,8 @@ fun ComposeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
-                    .focusRequester(subjectFocusRequester),
+                    .focusRequester(subjectFocusRequester)
+                    .onFocusChanged { if (it.isFocused) focusedFieldIndex = 3 },
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
@@ -738,7 +860,8 @@ fun ComposeScreen(
                     .fillMaxWidth()
                     .defaultMinSize(minHeight = 200.dp)
                     .padding(horizontal = 16.dp)
-                    .focusRequester(bodyFocusRequester),
+                    .focusRequester(bodyFocusRequester)
+                    .onFocusChanged { if (it.isFocused) focusedFieldIndex = 4 },
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
                     focusedContainerColor = MaterialTheme.colorScheme.surface,

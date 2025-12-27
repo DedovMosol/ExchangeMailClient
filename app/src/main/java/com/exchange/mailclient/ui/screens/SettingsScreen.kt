@@ -1,5 +1,8 @@
 package com.exchange.mailclient.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,6 +31,7 @@ import com.exchange.mailclient.ui.AppLanguage
 import com.exchange.mailclient.ui.LocalLanguage
 import com.exchange.mailclient.ui.Strings
 import com.exchange.mailclient.ui.isRussian
+import com.exchange.mailclient.ui.theme.LocalColorTheme
 import com.exchange.mailclient.ui.theme.LocalColorTheme
 import com.exchange.mailclient.ui.theme.AppColorTheme
 import kotlinx.coroutines.launch
@@ -322,6 +326,11 @@ fun SettingsScreen(
                         scope.launch {
                             accountRepo.updateSignature(account.id, signature)
                         }
+                    },
+                    onCertificateChange = { newPath ->
+                        scope.launch {
+                            accountRepo.updateCertificatePath(account.id, newPath)
+                        }
                     }
                 )
             }
@@ -604,16 +613,21 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("Exchange Mail Client") },
-                    supportingContent = { Text("${Strings.version} 1.0.8") },
+                    supportingContent = { Text("${Strings.version} 1.0.9") },
                     leadingContent = { Icon(Icons.Default.Info, null) }
                 )
             }
             
             item {
+                val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
                 ListItem(
                     headlineContent = { Text(Strings.developer) },
                     supportingContent = { Text("DedovMosol") },
-                    leadingContent = { Icon(Icons.Default.Person, null) }
+                    leadingContent = { Icon(Icons.Default.Person, null) },
+                    trailingContent = { Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(18.dp)) },
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://github.com/DedovMosol/")
+                    }
                 )
             }
             
@@ -648,13 +662,55 @@ private fun AccountSettingsItem(
     onDeleteClick: () -> Unit,
     onSyncModeChange: (SyncMode) -> Unit,
     onSyncIntervalChange: (Int) -> Unit,
-    onSignatureChange: (String) -> Unit
+    onSignatureChange: (String) -> Unit,
+    onCertificateChange: (String?) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val isRu = isRussian()
     var showSyncModeDialog by remember { mutableStateOf(false) }
     var showSyncIntervalDialog by remember { mutableStateOf(false) }
     var showSignatureDialog by remember { mutableStateOf(false) }
+    var showCertificateDialog by remember { mutableStateOf(false) }
     var signatureText by remember(account.signature) { mutableStateOf(account.signature) }
+    
+    // Получаем имя файла сертификата для экспорта
+    val certFileName = account.certificatePath?.let { java.io.File(it).name } ?: "certificate.cer"
+    
+    // Пикер для экспорта сертификата (пользователь выбирает куда сохранить)
+    val exportCertificatePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("*/*")
+    ) { uri: Uri? ->
+        uri?.let { destUri ->
+            scope.launch {
+                try {
+                    account.certificatePath?.let { certPath ->
+                        val certFile = java.io.File(certPath)
+                        if (certFile.exists()) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                context.contentResolver.openOutputStream(destUri)?.use { output ->
+                                    certFile.inputStream().use { input ->
+                                        input.copyTo(output)
+                                    }
+                                }
+                            }
+                            android.widget.Toast.makeText(
+                                context,
+                                if (isRu) "Сертификат экспортирован" else "Certificate exported",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(
+                        context,
+                        if (isRu) "Ошибка экспорта" else "Export error",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
     
     val accountType = try {
         AccountType.valueOf(account.accountType)
@@ -666,6 +722,161 @@ private fun AccountSettingsItem(
         SyncMode.valueOf(account.syncMode)
     } catch (_: Exception) {
         SyncMode.PUSH
+    }
+    
+    // Пикер для замены сертификата
+    val certificatePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            scope.launch {
+                try {
+                    val validExtensions = listOf("cer", "crt", "pem", "der", "p12", "pfx", "p7b", "p7c")
+                    var originalFileName: String? = null
+                    val cursor = context.contentResolver.query(selectedUri, null, null, null, null)
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (nameIndex >= 0) {
+                                originalFileName = it.getString(nameIndex)
+                            }
+                        }
+                    }
+                    
+                    val extension = originalFileName?.substringAfterLast('.', "")?.lowercase() ?: ""
+                    if (extension !in validExtensions) {
+                        android.widget.Toast.makeText(
+                            context,
+                            if (isRu) "Неверный формат файла" else "Invalid file format",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                        return@launch
+                    }
+                    
+                    // Удаляем старый сертификат
+                    account.certificatePath?.let { oldPath ->
+                        try { java.io.File(oldPath).delete() } catch (_: Exception) {}
+                    }
+                    
+                    // Копируем новый
+                    val fileName = "cert_${account.id}_${System.currentTimeMillis()}.$extension"
+                    val certFile = java.io.File(context.filesDir, fileName)
+                    
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        context.contentResolver.openInputStream(selectedUri)?.use { input ->
+                            certFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    }
+                    
+                    onCertificateChange(certFile.absolutePath)
+                    android.widget.Toast.makeText(
+                        context,
+                        if (isRu) "Сертификат обновлён" else "Certificate updated",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(
+                        context,
+                        if (isRu) "Ошибка загрузки сертификата" else "Certificate loading error",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+    
+    // Диалог управления сертификатом
+    if (showCertificateDialog && !account.certificatePath.isNullOrBlank()) {
+        val certFile = java.io.File(account.certificatePath!!)
+        val certFileName = certFile.name
+        val certFileSize = if (certFile.exists()) "${certFile.length() / 1024} KB" else "—"
+        
+        com.exchange.mailclient.ui.theme.StyledAlertDialog(
+            onDismissRequest = { showCertificateDialog = false },
+            icon = { Icon(Icons.Default.Lock, null) },
+            title = { Text(Strings.serverCertificate) },
+            text = {
+                Column {
+                    // Информация о сертификате
+                    Text(
+                        if (isRu) "Файл:" else "File:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(certFileName, style = MaterialTheme.typography.bodyMedium)
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text(
+                        if (isRu) "Размер:" else "Size:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(certFileSize, style = MaterialTheme.typography.bodyMedium)
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Кнопки действий
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Экспортировать
+                        OutlinedButton(
+                            onClick = {
+                                showCertificateDialog = false
+                                exportCertificatePicker.launch(certFileName)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isRu) "Экспортировать" else "Export")
+                        }
+                        
+                        // Заменить
+                        OutlinedButton(
+                            onClick = {
+                                showCertificateDialog = false
+                                certificatePicker.launch(arrayOf("*/*"))
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.SwapHoriz, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isRu) "Заменить" else "Replace")
+                        }
+                        
+                        // Удалить
+                        OutlinedButton(
+                            onClick = {
+                                showCertificateDialog = false
+                                // Удаляем файл
+                                try { certFile.delete() } catch (_: Exception) {}
+                                onCertificateChange(null)
+                                android.widget.Toast.makeText(
+                                    context,
+                                    if (isRu) "Сертификат удалён" else "Certificate removed",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(Icons.Default.Delete, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (isRu) "Удалить" else "Remove")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showCertificateDialog = false }) {
+                    Text(Strings.close)
+                }
+            }
+        )
     }
     
     // Диалог выбора режима синхронизации (только для Exchange)
@@ -798,6 +1009,35 @@ private fun AccountSettingsItem(
                 supportingContent = { 
                     Column {
                         Text(account.email)
+                        // Показываем сертификат если есть (кликабельный)
+                        if (!account.certificatePath.isNullOrBlank()) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .clickable { showCertificateDialog = true }
+                            ) {
+                                Icon(
+                                    Icons.Default.Lock,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = Strings.serverCertificate,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
                         Text(
                             accountType.displayName,
                             style = MaterialTheme.typography.bodySmall,
@@ -810,7 +1050,7 @@ private fun AccountSettingsItem(
                         modifier = Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(Color(account.color)),
+                            .background(LocalColorTheme.current.gradientStart),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

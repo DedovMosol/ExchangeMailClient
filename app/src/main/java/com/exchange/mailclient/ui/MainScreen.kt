@@ -52,7 +52,8 @@ fun MainScreen(
     onNavigateToCompose: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToSearch: () -> Unit = {},
-    onNavigateToEmailDetail: (String) -> Unit = {}
+    onNavigateToEmailDetail: (String) -> Unit = {},
+    onNavigateToContacts: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -524,6 +525,10 @@ fun MainScreen(
                     onSettingsClick = {
                         scope.launch { drawerState.close() }
                         onNavigateToSettings()
+                    },
+                    onContactsClick = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToContacts()
                     },
                     onCreateFolder = {
                         scope.launch { drawerState.close() }
@@ -1155,7 +1160,7 @@ private fun HomeContent(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "v1.0.8",
+                                text = "v1.0.9",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1807,7 +1812,7 @@ private fun SearchTopBar(
                     modifier = Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(Color(accountColor)),
+                        .background(colorTheme.gradientStart),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -1836,6 +1841,7 @@ private fun DrawerContent(
     onFolderSelected: (FolderEntity) -> Unit,
     onFavoritesClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onContactsClick: () -> Unit = {},
     onCreateFolder: () -> Unit = {},
     onFolderLongClick: (FolderEntity) -> Unit = {}
 ) {
@@ -1935,6 +1941,15 @@ private fun DrawerContent(
                 headlineContent = { Text(Strings.createFolder) },
                 leadingContent = { Icon(Icons.Default.CreateNewFolder, null) },
                 modifier = Modifier.clickable(onClick = onCreateFolder)
+            )
+        }
+        
+        // Контакты
+        item {
+            ListItem(
+                headlineContent = { Text(Strings.contacts) },
+                leadingContent = { Icon(Icons.Default.People, null) },
+                modifier = Modifier.clickable(onClick = onContactsClick)
             )
         }
         
@@ -2128,6 +2143,25 @@ private fun TipItem(
     iconColor: Color = MaterialTheme.colorScheme.tertiary,
     iconBackgroundColor: Color = MaterialTheme.colorScheme.tertiaryContainer
 ) {
+    val animationsEnabled = com.exchange.mailclient.ui.theme.LocalAnimationsEnabled.current
+    
+    // Анимация пульсации иконки
+    val iconScale: Float
+    if (animationsEnabled) {
+        val infiniteTransition = rememberInfiniteTransition(label = "tipIcon")
+        iconScale = infiniteTransition.animateFloat(
+            initialValue = 1f,
+            targetValue = 1.15f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = FastOutSlowInEasing),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "tipIconScale"
+        ).value
+    } else {
+        iconScale = 1f
+    }
+    
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
@@ -2135,6 +2169,7 @@ private fun TipItem(
         Box(
             modifier = Modifier
                 .size(32.dp)
+                .scale(iconScale)
                 .clip(CircleShape)
                 .background(iconBackgroundColor),
             contentAlignment = Alignment.Center

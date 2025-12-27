@@ -1,10 +1,5 @@
 package com.exchange.mailclient.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.*
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -12,11 +7,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.exchange.mailclient.ui.Strings
-import com.exchange.mailclient.ui.theme.LocalAnimationsEnabled
 import kotlinx.coroutines.*
 
 /**
@@ -110,22 +103,19 @@ fun DeletionProgressBar(
     modifier: Modifier = Modifier
 ) {
     val state = controller.state
-    val animationsEnabled = LocalAnimationsEnabled.current
     
-    AnimatedVisibility(
-        visible = state.isActive,
-        enter = slideInVertically(initialOffsetY = { -it }),
-        exit = slideOutVertically(targetOffsetY = { -it }),
-        modifier = modifier
-    ) {
+    // Показываем только когда активно
+    if (state.isActive) {
         Surface(
+            modifier = modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.errorContainer,
-            shadowElevation = 4.dp
+            shadowElevation = 8.dp,
+            tonalElevation = 4.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -165,25 +155,14 @@ fun DeletionProgressBar(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 // Прогресс-бар
-                if (animationsEnabled) {
-                    LinearProgressIndicator(
-                        progress = { state.progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        trackColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f)
-                    )
-                } else {
-                    LinearProgressIndicator(
-                        progress = { state.progress },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp),
-                        color = MaterialTheme.colorScheme.error,
-                        trackColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f)
-                    )
-                }
+                LinearProgressIndicator(
+                    progress = { state.progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp),
+                    color = MaterialTheme.colorScheme.error,
+                    trackColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.2f)
+                )
             }
         }
     }

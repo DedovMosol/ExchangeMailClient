@@ -47,6 +47,9 @@ interface AccountDao {
     @Query("UPDATE accounts SET signature = :signature WHERE id = :id")
     suspend fun updateSignature(id: Long, signature: String)
     
+    @Query("UPDATE accounts SET certificatePath = :certificatePath WHERE id = :id")
+    suspend fun updateCertificatePath(id: Long, certificatePath: String?)
+    
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(account: AccountEntity): Long
     
@@ -219,7 +222,31 @@ interface EmailDao {
      */
     @Query("SELECT * FROM emails WHERE folderId = :folderId AND dateReceived < :beforeTime")
     suspend fun getEmailsOlderThan(folderId: String, beforeTime: Long): List<EmailEntity>
+    
+    /**
+     * Получает уникальные email адреса из истории переписки для автодополнения
+     * Ищет по полям from, to, fromName
+     */
+    @Query("""
+        SELECT DISTINCT `from` as email, fromName as name FROM emails 
+        WHERE accountId = :accountId 
+        AND (`from` LIKE :query || '%' OR fromName LIKE '%' || :query || '%')
+        UNION
+        SELECT DISTINCT `to` as email, '' as name FROM emails 
+        WHERE accountId = :accountId 
+        AND `to` LIKE :query || '%'
+        LIMIT :limit
+    """)
+    suspend fun searchEmailHistory(accountId: Long, query: String, limit: Int = 10): List<EmailHistoryResult>
 }
+
+/**
+ * Результат поиска по истории писем
+ */
+data class EmailHistoryResult(
+    val email: String,
+    val name: String
+)
 
 @Dao
 interface AttachmentDao {
@@ -240,5 +267,12 @@ interface AttachmentDao {
     
     @Query("DELETE FROM attachments WHERE emailId = :emailId")
     suspend fun deleteByEmail(emailId: String)
+    
+    @Query("""
+        SELECT a.localPath FROM attachments a
+        INNER JOIN emails e ON a.emailId = e.id
+        WHERE e.accountId = :accountId AND a.localPath IS NOT NULL
+    """)
+    suspend fun getLocalPathsByAccount(accountId: Long): List<String>
 }
 

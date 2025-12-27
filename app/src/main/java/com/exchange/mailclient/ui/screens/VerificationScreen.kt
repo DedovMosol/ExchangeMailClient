@@ -1,12 +1,16 @@
 package com.exchange.mailclient.ui.screens
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -156,64 +160,126 @@ fun VerificationScreen(
     
     // Диалог несовпадения email
     if (showMismatchDialog) {
+        val colorTheme = com.exchange.mailclient.ui.theme.LocalColorTheme.current
+        val animationsEnabled = com.exchange.mailclient.ui.theme.LocalAnimationsEnabled.current
+        
+        var visible by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) { visible = true }
+        
+        val scale by animateFloatAsState(
+            targetValue = if (visible && animationsEnabled) 1f else 0.8f,
+            animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+            label = "scale"
+        )
+        val alpha by animateFloatAsState(
+            targetValue = if (visible) 1f else 0f,
+            animationSpec = tween(200),
+            label = "alpha"
+        )
+        
         androidx.compose.ui.window.Dialog(onDismissRequest = { }) {
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
             ) {
-                Column(
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Text(
-                        emailMismatchTitle,
-                        style = MaterialTheme.typography.headlineSmall
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
-                    
-                    Text(
-                        if (isRussianLang) "Введённый email:" else "Entered email:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        mismatchEnteredEmail,
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Text(
-                        if (isRussianLang) "Реальный email:" else "Actual email:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        mismatchActualEmail,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Text(
-                        if (isRussianLang) "Пожалуйста, введите правильный email." 
-                        else "Please enter the correct email.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Justify
-                    )
-                    
-                    Row(
+                Column {
+                    // Градиентная полоска сверху
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 24.dp),
-                        horizontalArrangement = Arrangement.End
+                            .height(4.dp)
+                            .background(
+                                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                    colors = listOf(colorTheme.gradientStart, colorTheme.gradientEnd)
+                                )
+                            )
+                    )
+                    
+                    Column(
+                        modifier = Modifier.padding(24.dp)
                     ) {
-                        TextButton(onClick = {
-                            showMismatchDialog = false
-                            onError("CLEAR_EMAIL", createSavedDataForEmailMismatch())
-                        }) {
-                            Text("OK")
+                        // Иконка в градиентном круге
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .align(Alignment.CenterHorizontally)
+                                .background(
+                                    brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                        colors = listOf(colorTheme.gradientStart, colorTheme.gradientEnd)
+                                    ),
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = androidx.compose.ui.graphics.Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            emailMismatchTitle,
+                            style = MaterialTheme.typography.headlineSmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        Text(
+                            Strings.enteredEmail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            mismatchEnteredEmail,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Text(
+                            Strings.actualEmail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            mismatchActualEmail,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Text(
+                            Strings.pleaseEnterCorrectEmail,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Justify
+                        )
+                        
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 24.dp),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            com.exchange.mailclient.ui.theme.GradientDialogButton(
+                                onClick = {
+                                    showMismatchDialog = false
+                                    onError("CLEAR_EMAIL", createSavedDataForEmailMismatch())
+                                },
+                                text = "OK"
+                            )
                         }
                     }
                 }

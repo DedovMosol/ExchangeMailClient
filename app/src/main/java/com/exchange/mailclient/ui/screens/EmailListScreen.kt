@@ -244,19 +244,8 @@ fun EmailListScreen(
     LaunchedEffect(folderId) {
         if (!isFavorites) {
             folder = withContext(Dispatchers.IO) { database.folderDao().getFolder(folderId) }
-            if (!folderSynced) {
-                folder?.let { f ->
-                    isRefreshing = true
-                    errorMessage = null
-                    val result = withContext(Dispatchers.IO) { mailRepo.syncEmails(f.accountId, folderId) }
-                    when (result) {
-                        is EasResult.Success -> {}
-                        is EasResult.Error -> errorMessage = result.message
-                    }
-                    isRefreshing = false
-                    folderSynced = true
-                }
-            }
+            // Не синхронизируем автоматически — данные уже загружены в MainScreen
+            // Пользователь может нажать кнопку обновления вручную если нужно
         }
     }
 
@@ -363,9 +352,9 @@ fun EmailListScreen(
     // Диалог подтверждения удаления (в корзину)
     if (showDeleteDialog) {
         val count = selectedIds.size
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
+        com.exchange.mailclient.ui.theme.StyledAlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            icon = { Icon(Icons.Default.Delete, null) },
             title = { Text(if (count == 1) Strings.deleteEmail else Strings.deleteEmails) },
             text = { 
                 Text(
@@ -374,12 +363,13 @@ fun EmailListScreen(
                 ) 
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showDeleteDialog = false
-                    deleteSelected()
-                }) {
-                    Text(Strings.yes, color = MaterialTheme.colorScheme.error)
-                }
+                com.exchange.mailclient.ui.theme.GradientDialogButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        deleteSelected()
+                    },
+                    text = Strings.yes
+                )
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
@@ -392,9 +382,9 @@ fun EmailListScreen(
     // Диалог подтверждения окончательного удаления
     if (showDeletePermanentlyDialog) {
         val count = selectedIds.size
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
+        com.exchange.mailclient.ui.theme.StyledAlertDialog(
             onDismissRequest = { showDeletePermanentlyDialog = false },
-            icon = { Icon(Icons.Default.DeleteForever, null, tint = MaterialTheme.colorScheme.error) },
+            icon = { Icon(Icons.Default.DeleteForever, null) },
             title = { Text(Strings.deleteForever) },
             text = { 
                 Text(
@@ -403,12 +393,13 @@ fun EmailListScreen(
                 ) 
             },
             confirmButton = {
-                TextButton(onClick = {
-                    showDeletePermanentlyDialog = false
-                    deleteSelectedPermanently()
-                }) {
-                    Text(Strings.delete, color = MaterialTheme.colorScheme.error)
-                }
+                com.exchange.mailclient.ui.theme.GradientDialogButton(
+                    onClick = {
+                        showDeletePermanentlyDialog = false
+                        deleteSelectedPermanently()
+                    },
+                    text = Strings.delete
+                )
             },
             dismissButton = {
                 TextButton(onClick = { showDeletePermanentlyDialog = false }) {
@@ -424,13 +415,13 @@ fun EmailListScreen(
         val deletingMessage = Strings.deletingEmails(displayEmails.size)
         val trashEmptiedMsg = Strings.trashEmptied
         
-        com.exchange.mailclient.ui.theme.ScaledAlertDialog(
+        com.exchange.mailclient.ui.theme.StyledAlertDialog(
             onDismissRequest = { showEmptyTrashDialog = false },
-            icon = { Icon(Icons.Default.DeleteForever, null, tint = MaterialTheme.colorScheme.error) },
+            icon = { Icon(Icons.Default.DeleteForever, null) },
             title = { Text(Strings.emptyTrash) },
             text = { Text(Strings.emptyTrashConfirm) },
             confirmButton = {
-                TextButton(
+                com.exchange.mailclient.ui.theme.GradientDialogButton(
                     onClick = {
                         showEmptyTrashDialog = false
                         com.exchange.mailclient.util.SoundPlayer.playDeleteSound(context)
@@ -461,10 +452,9 @@ fun EmailListScreen(
                                 }
                             }
                         }
-                    }
-                ) {
-                    Text(Strings.delete, color = MaterialTheme.colorScheme.error)
-                }
+                    },
+                    text = Strings.delete
+                )
             },
             dismissButton = {
                 TextButton(onClick = { showEmptyTrashDialog = false }) {

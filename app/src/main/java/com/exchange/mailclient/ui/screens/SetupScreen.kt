@@ -110,15 +110,40 @@ fun SetupScreen(
     var certificatePath by rememberSaveable { mutableStateOf<String?>(null) }
     var certificateFileName by rememberSaveable { mutableStateOf<String?>(null) }
     
+    // Допустимые расширения сертификатов
+    val validCertExtensions = listOf("cer", "crt", "pem", "der", "p12", "pfx", "p7b", "p7c")
+    
     // Файловый пикер для выбора сертификата
     val certificatePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let { selectedUri ->
             scope.launch {
                 try {
+                    // Получаем имя файла
+                    var originalFileName: String? = null
+                    val cursor = context.contentResolver.query(selectedUri, null, null, null, null)
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (nameIndex >= 0) {
+                                originalFileName = it.getString(nameIndex)
+                            }
+                        }
+                    }
+                    
+                    // Проверяем расширение
+                    val extension = originalFileName?.substringAfterLast('.', "")?.lowercase() ?: ""
+                    if (extension !in validCertExtensions) {
+                        errorMessage = if (isRussianLang) 
+                            "Неверный формат файла. Допустимые: ${validCertExtensions.joinToString(", ") { ".$it" }}" 
+                        else 
+                            "Invalid file format. Allowed: ${validCertExtensions.joinToString(", ") { ".$it" }}"
+                        return@launch
+                    }
+                    
                     // Копируем файл в приватное хранилище приложения
-                    val fileName = "cert_${System.currentTimeMillis()}.crt"
+                    val fileName = "cert_${System.currentTimeMillis()}.$extension"
                     val certFile = File(context.filesDir, fileName)
                     
                     withContext(Dispatchers.IO) {
@@ -130,19 +155,7 @@ fun SetupScreen(
                     }
                     
                     certificatePath = certFile.absolutePath
-                    // Получаем оригинальное имя файла
-                    val cursor = context.contentResolver.query(selectedUri, null, null, null, null)
-                    cursor?.use {
-                        if (it.moveToFirst()) {
-                            val nameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                            if (nameIndex >= 0) {
-                                certificateFileName = it.getString(nameIndex)
-                            }
-                        }
-                    }
-                    if (certificateFileName == null) {
-                        certificateFileName = fileName
-                    }
+                    certificateFileName = originalFileName ?: fileName
                 } catch (e: Exception) {
                     errorMessage = if (isRussianLang) "Ошибка загрузки сертификата" else "Certificate loading error"
                 }
@@ -924,7 +937,19 @@ fun SetupScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = { certificatePicker.launch("*/*") },
+                                onClick = { 
+                                    // MIME-типы для сертификатов + общий для файлов без типа
+                                    certificatePicker.launch(arrayOf(
+                                        "application/x-x509-ca-cert",      // .cer, .crt
+                                        "application/x-pem-file",          // .pem
+                                        "application/pkix-cert",           // .cer
+                                        "application/pkcs12",              // .p12, .pfx
+                                        "application/x-pkcs12",            // .p12, .pfx
+                                        "application/x-pkcs7-certificates", // .p7b, .p7c
+                                        "application/octet-stream",        // общий бинарный
+                                        "*/*"                              // fallback для всех
+                                    ))
+                                },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Icon(Icons.Default.FileOpen, null, modifier = Modifier.size(18.dp))

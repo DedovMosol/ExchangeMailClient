@@ -21,14 +21,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupProperties
 import androidx.work.*
 import com.exchange.mailclient.data.database.AccountEntity
+import com.exchange.mailclient.data.database.ContactEntity
+import com.exchange.mailclient.data.database.MailDatabase
 import com.exchange.mailclient.data.repository.AccountRepository
+import com.exchange.mailclient.data.repository.ContactRepository
 import com.exchange.mailclient.data.repository.MailRepository
 import com.exchange.mailclient.eas.EasClient
 import com.exchange.mailclient.eas.EasResult
@@ -38,10 +44,27 @@ import com.exchange.mailclient.ui.NotificationStrings
 import com.exchange.mailclient.ui.Strings
 import com.exchange.mailclient.ui.theme.LocalColorTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
 import java.util.concurrent.TimeUnit
+
+/**
+ * Подсказка для автодополнения email
+ */
+data class EmailSuggestion(
+    val email: String,
+    val name: String,
+    val source: SuggestionSource
+)
+
+enum class SuggestionSource {
+    CONTACT,    // Из локальных контактов
+    HISTORY,    // Из истории писем
+    GAL         // Из корпоративной книги
+}
 
 data class AttachmentInfo(
     val uri: Uri,
@@ -55,6 +78,7 @@ data class AttachmentInfo(
 fun ComposeScreen(
     replyToEmailId: String? = null,
     forwardEmailId: String? = null,
+    initialToEmail: String? = null,
     onBackClick: () -> Unit,
     onSent: () -> Unit
 ) {
@@ -92,6 +116,85 @@ fun ComposeScreen(
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     
+    // Автодополнение email
+    val database = remember { MailDatabase.getInstance(context) }
+    val contactRepo = remember { ContactRepository(context) }
+    var toSuggestions by remember { mutableStateOf<List<EmailSuggestion>>(emptyList()) }
+    var showToSuggestions by remember { mutableStateOf(false) }
+    var toFieldFocused by remember { mutableStateOf(false) }
+    var suggestionSearchJob by remember { mutableStateOf<Job?>(null) }
+    val focusManager = LocalFocusManager.current
+    
+    // Функция поиска подсказок
+    fun searchSuggestions(query: String, accountId: Long) {
+        suggestionSearchJob?.cancel()
+        if (query.length < 2) {
+            toSuggestions = emptyList()
+            showToSuggestions = false
+            return
+        }
+        
+        suggestionSearchJob = scope.launch {
+            val suggestions = mutableListOf<EmailSuggestion>()
+            
+            // 1. Поиск по локальным контактам (мгновенно)
+            withContext(Dispatchers.IO) {
+                val contacts = database.contactDao().searchForAutocomplete(accountId, query, 5)
+                contacts.forEach { contact ->
+                    suggestions.add(EmailSuggestion(
+                        email = contact.email,
+                        name = contact.displayName,
+                        source = SuggestionSource.CONTACT
+                    ))
+                }
+            }
+            
+            // 2. Поиск по истории писем (мгновенно)
+            withContext(Dispatchers.IO) {
+                val history = database.emailDao().searchEmailHistory(accountId, query, 5)
+                history.forEach { result ->
+                    // Не добавляем дубликаты
+                    if (suggestions.none { it.email.equals(result.email, ignoreCase = true) }) {
+                        suggestions.add(EmailSuggestion(
+                            email = result.email,
+                            name = result.name,
+                            source = SuggestionSource.HISTORY
+                        ))
+                    }
+                }
+            }
+            
+            toSuggestions = suggestions.take(8)
+            showToSuggestions = suggestions.isNotEmpty() && toFieldFocused
+            
+            // 3. Поиск по GAL с задержкой (если ≥3 символа)
+            if (query.length >= 3) {
+                delay(500) // Debounce
+                try {
+                    val client = accountRepo.createEasClient(accountId)
+                    if (client != null) {
+                        val galResult = withContext(Dispatchers.IO) {
+                            client.searchGAL(query)
+                        }
+                        if (galResult is EasResult.Success) {
+                            val galSuggestions = galResult.data.take(5).mapNotNull { gal ->
+                                if (suggestions.none { it.email.equals(gal.email, ignoreCase = true) }) {
+                                    EmailSuggestion(
+                                        email = gal.email,
+                                        name = gal.displayName,
+                                        source = SuggestionSource.GAL
+                                    )
+                                } else null
+                            }
+                            toSuggestions = (suggestions + galSuggestions).take(10)
+                            showToSuggestions = toSuggestions.isNotEmpty() && toFieldFocused
+                        }
+                    }
+                } catch (_: Exception) { }
+            }
+        }
+    }
+    
     // Загружаем активный аккаунт и все аккаунты
     LaunchedEffect(Unit) {
         activeAccount = accountRepo.getActiveAccountSync()
@@ -100,6 +203,10 @@ fun ComposeScreen(
             activeAccount?.signature?.takeIf { it.isNotBlank() }?.let { sig ->
                 body = "\n\n--\n$sig"
             }
+        }
+        // Подставляем email из контактов
+        if (initialToEmail != null && to.isEmpty()) {
+            to = initialToEmail
         }
         accountRepo.accounts.collect { allAccounts = it }
     }
@@ -449,34 +556,103 @@ fun ComposeScreen(
             }
             HorizontalDivider()
             
-            // Кому
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { toFocusRequester.requestFocus() }
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(Strings.to, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(100.dp), maxLines = 1, softWrap = false)
-                TextField(
-                    value = to,
-                    onValueChange = { to = it },
+            // Кому с автодополнением
+            Box {
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .focusRequester(toFocusRequester),
-                    colors = TextFieldDefaults.colors(
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedIndicatorColor = MaterialTheme.colorScheme.surface,
-                        focusedIndicatorColor = MaterialTheme.colorScheme.surface
-                    ),
-                    singleLine = true
-                )
-                IconButton(onClick = { showCcBcc = !showCcBcc }) {
-                    Icon(
-                        if (showCcBcc) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                        Strings.showCopy
+                        .fillMaxWidth()
+                        .clickable { toFocusRequester.requestFocus() }
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(Strings.to, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(100.dp), maxLines = 1, softWrap = false)
+                    TextField(
+                        value = to,
+                        onValueChange = { newValue ->
+                            to = newValue
+                            activeAccount?.id?.let { accountId ->
+                                searchSuggestions(newValue, accountId)
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(toFocusRequester)
+                            .onFocusChanged { focusState ->
+                                toFieldFocused = focusState.isFocused
+                                if (!focusState.isFocused) {
+                                    showToSuggestions = false
+                                }
+                            },
+                        colors = TextFieldDefaults.colors(
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedIndicatorColor = MaterialTheme.colorScheme.surface,
+                            focusedIndicatorColor = MaterialTheme.colorScheme.surface
+                        ),
+                        singleLine = true
                     )
+                    IconButton(onClick = { showCcBcc = !showCcBcc }) {
+                        Icon(
+                            if (showCcBcc) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            Strings.showCopy
+                        )
+                    }
+                }
+                
+                // Выпадающий список подсказок
+                DropdownMenu(
+                    expanded = showToSuggestions && toSuggestions.isNotEmpty(),
+                    onDismissRequest = { showToSuggestions = false },
+                    modifier = Modifier
+                        .fillMaxWidth(0.9f)
+                        .heightIn(max = 300.dp),
+                    properties = PopupProperties(focusable = false)
+                ) {
+                    toSuggestions.forEach { suggestion ->
+                        DropdownMenuItem(
+                            text = {
+                                Column {
+                                    if (suggestion.name.isNotBlank() && suggestion.name != suggestion.email) {
+                                        Text(
+                                            suggestion.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    Text(
+                                        suggestion.email,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            },
+                            onClick = {
+                                to = suggestion.email
+                                showToSuggestions = false
+                                // Увеличиваем счётчик использования контакта
+                                if (suggestion.source == SuggestionSource.CONTACT) {
+                                    scope.launch {
+                                        activeAccount?.id?.let { accountId ->
+                                            withContext(Dispatchers.IO) {
+                                                database.contactDao().incrementUseCountByEmail(accountId, suggestion.email)
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    when (suggestion.source) {
+                                        SuggestionSource.CONTACT -> Icons.Default.Person
+                                        SuggestionSource.HISTORY -> Icons.Default.History
+                                        SuggestionSource.GAL -> Icons.Default.Business
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        )
+                    }
                 }
             }
             HorizontalDivider()

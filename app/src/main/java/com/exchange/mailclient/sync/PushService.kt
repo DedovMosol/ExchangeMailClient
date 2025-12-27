@@ -328,10 +328,10 @@ class PushService : Service() {
             .setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle(NotificationStrings.getPushServiceTitle(isRussian))
             .setContentText(NotificationStrings.getPushServiceText(isRussian))
-            .setPriority(NotificationCompat.PRIORITY_MIN) // Минимальный приоритет - сворачивается в иконку
+            .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
-            .setSilent(true) // Без звука
-            .setShowWhen(false) // Без времени
+            .setSilent(true)
+            .setShowWhen(false)
             .setContentIntent(pendingIntent)
             .build()
     }

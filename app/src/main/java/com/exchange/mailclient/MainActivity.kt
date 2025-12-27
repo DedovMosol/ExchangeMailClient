@@ -9,21 +9,20 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.unit.dp
@@ -46,50 +45,112 @@ private fun PermissionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    val colorTheme = com.exchange.mailclient.ui.theme.LocalColorTheme.current
+    val animationsEnabled = com.exchange.mailclient.ui.theme.LocalAnimationsEnabled.current
+    
+    // Анимация появления
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+    
+    val scale by animateFloatAsState(
+        targetValue = if (visible && animationsEnabled) 1f else 0.8f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
+        label = "scale"
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(200),
+        label = "alpha"
+    )
+    
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.extraLarge
+            modifier = Modifier
+                .fillMaxWidth()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                },
+            shape = RoundedCornerShape(28.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp)
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                
-                // Разбиваем текст на абзацы с красной строкой
-                Column(
-                    modifier = Modifier.padding(top = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    text.split("\n\n").forEach { paragraph ->
-                        if (paragraph.isNotBlank()) {
-                            Text(
-                                text = paragraph,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    textIndent = TextIndent(firstLine = 24.sp)
-                                ),
-                                textAlign = TextAlign.Justify
-                            )
-                        }
-                    }
-                }
-                
-                Row(
+            Column {
+                // Градиентная полоска сверху
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .height(4.dp)
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                colors = listOf(colorTheme.gradientStart, colorTheme.gradientEnd)
+                            )
+                        )
+                )
+                
+                Column(
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    TextButton(onClick = onDismiss) {
-                        Text(dismissText)
+                    // Иконка в градиентном круге
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .align(Alignment.CenterHorizontally)
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(colorTheme.gradientStart, colorTheme.gradientEnd)
+                                ),
+                                shape = CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Default.BatteryChargingFull,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
-                    TextButton(onClick = onConfirm) {
-                        Text(confirmText)
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    // Разбиваем текст на абзацы с красной строкой
+                    Column(
+                        modifier = Modifier.padding(top = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        text.split("\n\n").forEach { paragraph ->
+                            if (paragraph.isNotBlank()) {
+                                Text(
+                                    text = paragraph,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        textIndent = TextIndent(firstLine = 24.sp)
+                                    ),
+                                    textAlign = TextAlign.Justify
+                                )
+                            }
+                        }
+                    }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text(dismissText)
+                        }
+                        com.exchange.mailclient.ui.theme.GradientDialogButton(
+                            onClick = onConfirm,
+                            text = confirmText
+                        )
                     }
                 }
             }
@@ -112,12 +173,16 @@ class MainActivity : ComponentActivity() {
     private var openEmailId = mutableStateOf<String?>(null)
     private var showBatteryDialog = mutableStateOf(false)
     private var showAlarmDialog = mutableStateOf(false)
+    private var permissionsChecked = false
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableHighRefreshRate()
         requestNotificationPermission()
-        checkPermissionsForDialogs()
+        if (!permissionsChecked) {
+            permissionsChecked = true
+            checkPermissionsForDialogs()
+        }
         handleIntent(intent)
         
         enableEdgeToEdge()
@@ -234,6 +299,14 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
     
+    override fun onResume() {
+        super.onResume()
+        // После возврата из настроек проверяем следующее разрешение
+        if (permissionsChecked && !showBatteryDialog.value && !showAlarmDialog.value) {
+            checkNextPermission()
+        }
+    }
+    
     private fun handleIntent(intent: Intent?) {
         val emailId = intent?.getStringExtra(EXTRA_OPEN_EMAIL_ID)
         if (emailId != null) {
@@ -249,6 +322,18 @@ class MainActivity : ComponentActivity() {
             if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
                 showBatteryDialog.value = true
                 return
+            }
+        }
+        
+        checkNextPermission()
+    }
+    
+    private fun checkNextPermission() {
+        // Проверяем alarm только если батарея уже разрешена
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val powerManager = getSystemService(android.os.PowerManager::class.java)
+            if (!powerManager.isIgnoringBatteryOptimizations(packageName)) {
+                return // Батарея ещё не разрешена
             }
         }
         

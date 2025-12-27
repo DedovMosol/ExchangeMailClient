@@ -1,16 +1,22 @@
 package com.exchange.mailclient.ui.theme
 
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.animation.core.*
 import com.exchange.mailclient.ui.LocalFontScale
 import java.util.Calendar
 
@@ -223,4 +229,203 @@ fun ScaledAlertDialog(
         tonalElevation = tonalElevation,
         properties = properties
     )
+}
+
+/**
+ * Стилизованный диалог с градиентом под дизайн приложения
+ * - Градиентная полоска сверху
+ * - Иконка в градиентном круге (опционально)
+ * - Кнопки по разным углам
+ * - Главная кнопка с градиентом
+ * - Анимация появления
+ */
+@Composable
+fun StyledAlertDialog(
+    onDismissRequest: () -> Unit,
+    confirmButton: @Composable () -> Unit,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    dismissButton: @Composable (() -> Unit)? = null,
+    icon: @Composable (() -> Unit)? = null,
+    title: @Composable (() -> Unit)? = null,
+    text: @Composable (() -> Unit)? = null,
+    properties: DialogProperties = DialogProperties()
+) {
+    val fontScale = LocalFontScale.current
+    val baseDensity = LocalDensity.current
+    val scaledDensity = Density(
+        density = baseDensity.density,
+        fontScale = baseDensity.fontScale * fontScale
+    )
+    val colorTheme = LocalColorTheme.current
+    val animationsEnabled = LocalAnimationsEnabled.current
+    
+    // Анимация появления
+    var visible by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(Unit) { visible = true }
+    
+    val scale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (visible && animationsEnabled) 1f else 0.8f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = 0.6f,
+            stiffness = 400f
+        ),
+        label = "scale"
+    )
+    val alpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(200),
+        label = "alpha"
+    )
+    
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismissRequest,
+        properties = properties
+    ) {
+        CompositionLocalProvider(LocalDensity provides scaledDensity) {
+            androidx.compose.material3.Card(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        this.alpha = alpha
+                    },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp)
+            ) {
+                Column {
+                    // Градиентная полоска сверху
+                    Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .background(
+                                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                    colors = listOf(colorTheme.gradientStart, colorTheme.gradientEnd)
+                                )
+                            )
+                    )
+                    
+                    Column(
+                        modifier = androidx.compose.ui.Modifier.padding(24.dp),
+                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+                    ) {
+                        // Иконка в градиентном круге
+                        icon?.let {
+                            Box(
+                                modifier = androidx.compose.ui.Modifier
+                                    .size(56.dp)
+                                    .background(
+                                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                                            colors = listOf(colorTheme.gradientStart, colorTheme.gradientEnd)
+                                        ),
+                                        shape = androidx.compose.foundation.shape.CircleShape
+                                    ),
+                                contentAlignment = androidx.compose.ui.Alignment.Center
+                            ) {
+                                CompositionLocalProvider(
+                                    androidx.compose.material3.LocalContentColor provides Color.White
+                                ) {
+                                    it()
+                                }
+                            }
+                            Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
+                        }
+                        
+                        // Заголовок
+                        title?.let {
+                            CompositionLocalProvider(
+                                androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface
+                            ) {
+                                ProvideTextStyle(MaterialTheme.typography.headlineSmall) {
+                                    it()
+                                }
+                            }
+                            Spacer(modifier = androidx.compose.ui.Modifier.height(16.dp))
+                        }
+                        
+                        // Текст
+                        text?.let {
+                            CompositionLocalProvider(
+                                androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant
+                            ) {
+                                ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
+                                    it()
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = androidx.compose.ui.Modifier.height(24.dp))
+                        
+                        // Кнопки по разным углам
+                        Row(
+                            modifier = androidx.compose.ui.Modifier.fillMaxWidth(),
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
+                        ) {
+                            // Dismiss кнопка слева
+                            if (dismissButton != null) {
+                                dismissButton()
+                            } else {
+                                Spacer(modifier = androidx.compose.ui.Modifier.width(1.dp))
+                            }
+                            
+                            // Confirm кнопка справа
+                            confirmButton()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Градиентная кнопка для диалогов
+ */
+@Composable
+fun GradientDialogButton(
+    onClick: () -> Unit,
+    text: String,
+    modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier,
+    enabled: Boolean = true
+) {
+    val colorTheme = LocalColorTheme.current
+    
+    androidx.compose.material3.Button(
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent
+        ),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+    ) {
+        Box(
+            modifier = androidx.compose.ui.Modifier
+                .background(
+                    brush = if (enabled) {
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            colors = listOf(colorTheme.gradientStart, colorTheme.gradientEnd)
+                        )
+                    } else {
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            colors = listOf(Color.Gray, Color.Gray)
+                        )
+                    },
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)
+                )
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            Text(
+                text = text,
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+    }
 }

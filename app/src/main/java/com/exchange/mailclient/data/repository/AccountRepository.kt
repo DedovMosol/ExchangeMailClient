@@ -14,7 +14,10 @@ import com.exchange.mailclient.eas.EasClient
 import com.exchange.mailclient.eas.EasResult
 import com.exchange.mailclient.imap.ImapClient
 import com.exchange.mailclient.pop3.Pop3Client
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -25,6 +28,7 @@ class AccountRepository(private val context: Context) {
     
     private val database = MailDatabase.getInstance(context)
     private val accountDao = database.accountDao()
+    private val attachmentDao = database.attachmentDao()
     
     // Кэш EAS клиентов для предотвращения утечек памяти
     // Каждый EasClient создаёт OkHttpClient с connection pool
@@ -211,6 +215,27 @@ class AccountRepository(private val context: Context) {
         // Очищаем кэшированный клиент
         clearEasClientCache(accountId)
         
+        // Удаляем файлы вложений с диска (до каскадного удаления из БД)
+        withContext(Dispatchers.IO) {
+            try {
+                val localPaths = attachmentDao.getLocalPathsByAccount(accountId)
+                localPaths.forEach { path ->
+                    try {
+                        File(path).delete()
+                    } catch (_: Exception) {}
+                }
+            } catch (_: Exception) {}
+        }
+        
+        // Удаляем сертификат если был
+        val account = accountDao.getAccount(accountId)
+        account?.certificatePath?.let { certPath ->
+            try {
+                File(certPath).delete()
+            } catch (_: Exception) {}
+        }
+        
+        // Удаляем аккаунт (каскадно удалятся папки, письма, вложения, контакты)
         accountDao.delete(accountId)
         deletePassword(accountId)
         
@@ -307,6 +332,15 @@ class AccountRepository(private val context: Context) {
      */
     suspend fun updateSignature(accountId: Long, signature: String) {
         accountDao.updateSignature(accountId, signature)
+    }
+    
+    /**
+     * Обновляет путь к сертификату для аккаунта
+     */
+    suspend fun updateCertificatePath(accountId: Long, certificatePath: String?) {
+        // Очищаем кэш клиента чтобы использовался новый сертификат
+        clearEasClientCache(accountId)
+        accountDao.updateCertificatePath(accountId, certificatePath)
     }
     
     /**

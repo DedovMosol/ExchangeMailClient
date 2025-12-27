@@ -1,5 +1,40 @@
 # Changelog
 
+## v1.0.9 (27.12.2025)
+
+### New Features
+- **Contacts** — full contact management system:
+  - Personal contacts with add, edit and delete
+  - Corporate address book (GAL) search
+  - Export contacts to vCard (.vcf) and CSV
+  - Import contacts from vCard and CSV
+  - Alphabetical grouping and search
+  - Add GAL contacts to personal
+  - Integration with email composition
+- **Email autocomplete** — when typing in "To" field, suggestions appear from:
+  - Local contacts
+  - Email history
+  - Corporate address book (GAL)
+
+### Improvements
+- **Background sync** — all folders sync in background on app launch, folder content shows instantly from cache
+- **Styled dialogs** — unified gradient design for all dialogs
+- **Certificate indicator** — account settings now show if server certificate is used
+- **Certificate management** — tap on "Server certificate" to:
+  - View info (filename, size)
+  - Export (choose location and filename)
+  - Replace with another
+  - Remove
+- **Developer link** — "DedovMosol" in settings is now clickable and leads to GitHub
+
+### Bug Fixes
+- **Deletion progress bar** — fixed progress bar display when emptying trash
+- **Certificate selection** — now only certificate files can be selected (.cer, .crt, .pem, .der, .p12, .pfx, .p7b, .p7c)
+- **Account deletion** — deleting account now fully cleans up local data (attachment files, certificate)
+- **User avatar color** — avatar in search and settings now changes color with app theme
+
+---
+
 ## v1.0.8 (27.12.2025)
 
 ### New Features

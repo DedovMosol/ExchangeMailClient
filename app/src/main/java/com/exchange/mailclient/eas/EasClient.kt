@@ -2263,6 +2263,93 @@ $foldersXml
         val pattern = "<$tag>(.*?)</$tag>".toRegex(RegexOption.DOT_MATCHES_ALL)
         return pattern.find(xml)?.groupValues?.get(1)
     }
+    
+    /**
+     * Поиск в глобальной адресной книге (GAL)
+     * @param query Строка поиска (имя или email)
+     * @param maxResults Максимальное количество результатов (по умолчанию 100)
+     */
+    suspend fun searchGAL(query: String, maxResults: Int = 100): EasResult<List<GalContact>> {
+        if (query.length < 2) {
+            return EasResult.Success(emptyList())
+        }
+        
+        val xml = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Search xmlns="Search" xmlns:gal="Gal">
+                <Store>
+                    <Name>GAL</Name>
+                    <Query>$query</Query>
+                    <Options>
+                        <Range>0-${maxResults - 1}</Range>
+                    </Options>
+                </Store>
+            </Search>
+        """.trimIndent()
+        
+        return executeEasCommand("Search", xml) { responseXml ->
+            parseGalSearchResponse(responseXml)
+        }
+    }
+    
+    private fun parseGalSearchResponse(xml: String): List<GalContact> {
+        val contacts = mutableListOf<GalContact>()
+        
+        // Проверяем статус
+        val status = extractValue(xml, "Status")?.toIntOrNull() ?: 0
+        if (status != 1) {
+            return emptyList()
+        }
+        
+        // Парсим результаты
+        val resultPattern = "<Result>(.*?)</Result>".toRegex(RegexOption.DOT_MATCHES_ALL)
+        resultPattern.findAll(xml).forEach { match ->
+            val resultXml = match.groupValues[1]
+            
+            // Извлекаем Properties
+            val propsPattern = "<Properties>(.*?)</Properties>".toRegex(RegexOption.DOT_MATCHES_ALL)
+            val propsMatch = propsPattern.find(resultXml)
+            if (propsMatch != null) {
+                val propsXml = propsMatch.groupValues[1]
+                
+                val displayName = extractGalValue(propsXml, "DisplayName") ?: ""
+                val email = extractGalValue(propsXml, "EmailAddress") ?: ""
+                
+                if (displayName.isNotEmpty() || email.isNotEmpty()) {
+                    contacts.add(GalContact(
+                        displayName = displayName,
+                        email = email,
+                        firstName = extractGalValue(propsXml, "FirstName") ?: "",
+                        lastName = extractGalValue(propsXml, "LastName") ?: "",
+                        company = extractGalValue(propsXml, "Company") ?: "",
+                        department = extractGalValue(propsXml, "Office") ?: "", // Office часто содержит отдел
+                        jobTitle = extractGalValue(propsXml, "Title") ?: "",
+                        phone = extractGalValue(propsXml, "Phone") ?: "",
+                        mobilePhone = extractGalValue(propsXml, "MobilePhone") ?: "",
+                        alias = extractGalValue(propsXml, "Alias") ?: ""
+                    ))
+                }
+            }
+        }
+        
+        return contacts
+    }
+    
+    private fun extractGalValue(xml: String, tag: String): String? {
+        // GAL использует namespace gal:
+        val patterns = listOf(
+            "<gal:$tag>(.*?)</gal:$tag>",
+            "<$tag>(.*?)</$tag>"
+        )
+        for (pattern in patterns) {
+            val regex = pattern.toRegex(RegexOption.DOT_MATCHES_ALL)
+            val match = regex.find(xml)
+            if (match != null) {
+                return match.groupValues[1]
+            }
+        }
+        return null
+    }
 }
 
 sealed class EasResult<out T> {
@@ -2334,5 +2421,21 @@ data class EasAttachment(
 data class PingResult(
     val status: Int,
     val changedFolders: List<String> // ServerId папок с изменениями
+)
+
+/**
+ * Контакт из глобальной адресной книги (GAL)
+ */
+data class GalContact(
+    val displayName: String,
+    val email: String,
+    val firstName: String = "",
+    val lastName: String = "",
+    val company: String = "",
+    val department: String = "",
+    val jobTitle: String = "",
+    val phone: String = "",
+    val mobilePhone: String = "",
+    val alias: String = ""
 )
 

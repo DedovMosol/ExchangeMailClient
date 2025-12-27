@@ -141,8 +141,8 @@ sealed class Screen(val route: String) {
             }
         }
     }
-    object Compose : Screen("compose?replyTo={replyTo}&forwardId={forwardId}") {
-        fun createRoute(replyTo: String? = null, forwardId: String? = null): String {
+    object Compose : Screen("compose?replyTo={replyTo}&forwardId={forwardId}&toEmail={toEmail}") {
+        fun createRoute(replyTo: String? = null, forwardId: String? = null, toEmail: String? = null): String {
             val params = mutableListOf<String>()
             if (replyTo != null) {
                 val encoded = android.util.Base64.encodeToString(
@@ -158,6 +158,13 @@ sealed class Screen(val route: String) {
                 )
                 params.add("forwardId=$encoded")
             }
+            if (toEmail != null) {
+                val encoded = android.util.Base64.encodeToString(
+                    toEmail.toByteArray(Charsets.UTF_8), 
+                    android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP
+                )
+                params.add("toEmail=$encoded")
+            }
             return if (params.isNotEmpty()) "compose?${params.joinToString("&")}" else "compose"
         }
         fun decodeId(encoded: String?): String? {
@@ -171,6 +178,7 @@ sealed class Screen(val route: String) {
     }
     object Settings : Screen("settings")
     object Search : Screen("search")
+    object Contacts : Screen("contacts")
 }
 
 @Composable
@@ -343,6 +351,9 @@ fun AppNavigation(openInboxUnread: Boolean = false, openEmailId: String? = null)
                 },
                 onNavigateToEmailDetail = { emailId ->
                     navController.navigate(Screen.EmailDetail.createRoute(emailId))
+                },
+                onNavigateToContacts = {
+                    navController.navigate(Screen.Contacts.route)
                 }
             )
         }
@@ -497,14 +508,21 @@ fun AppNavigation(openInboxUnread: Boolean = false, openEmailId: String? = null)
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument("toEmail") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
             val replyTo = Screen.Compose.decodeId(backStackEntry.arguments?.getString("replyTo"))
             val forwardId = Screen.Compose.decodeId(backStackEntry.arguments?.getString("forwardId"))
+            val toEmail = Screen.Compose.decodeId(backStackEntry.arguments?.getString("toEmail"))
             ComposeScreen(
                 replyToEmailId = replyTo,
                 forwardEmailId = forwardId,
+                initialToEmail = toEmail,
                 onBackClick = { navController.popBackStack() },
                 onSent = { navController.popBackStack() }
             )
@@ -527,6 +545,16 @@ fun AppNavigation(openInboxUnread: Boolean = false, openEmailId: String? = null)
                 onBackClick = { navController.popBackStack() },
                 onEmailClick = { emailId ->
                     navController.navigate(Screen.EmailDetail.createRoute(emailId))
+                }
+            )
+        }
+        
+        composable(Screen.Contacts.route) {
+            ContactsScreen(
+                onBackClick = { navController.popBackStack() },
+                onComposeClick = { email ->
+                    // Создаём новое письмо с заполненным получателем
+                    navController.navigate(Screen.Compose.createRoute(toEmail = email))
                 }
             )
         }

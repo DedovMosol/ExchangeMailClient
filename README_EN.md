@@ -4,7 +4,7 @@
 
 Android mail client with Microsoft Exchange Server 2007+ (ActiveSync), IMAP and POP3 support.
 
-**Version:** 1.0.8  
+**Version:** 1.0.9  
 **Developer:** DedovMosol  
 **Telegram:** [@i_wantout](https://t.me/i_wantout)  
 **Email:** andreyid@outlook.com
@@ -32,6 +32,8 @@ Android mail client with Microsoft Exchange Server 2007+ (ActiveSync), IMAP and 
 | Deferred deletion with undo | ✅ |
 | Auto-empty trash | ✅ |
 | Create/delete/rename folders | ✅ |
+| Contacts with import/export | ✅ |
+| Email autocomplete | ✅ |
 | Multiple accounts | ✅ |
 | Push notifications (Direct Push) | ✅ |
 | Background sync | ✅ |
@@ -40,14 +42,13 @@ Android mail client with Microsoft Exchange Server 2007+ (ActiveSync), IMAP and 
 | Account signature | ✅ |
 | Read/delivery receipt request (MDN/DSN) | ✅ |
 
-## 🆕 What's New in v1.0.8
+## 🆕 What's New in v1.0.9
 
-- **Deferred deletion** — empty trash with progress bar and cancel option
-- **Auto-empty trash** — automatically delete old emails after 3/5/7/14/30 days
-- **Animation settings** — toggle to enable/disable UI animations (enabled by default)
-- **"View changelog" button** — link to changelog on GitHub
-- **Privacy policy link** — in app settings
-- **Server certificate selection** — support for corporate self-signed certificates
+- **Contacts** — full contact management system with import/export
+- **Email autocomplete** — suggestions from contacts, history and GAL when typing email
+- **Styled dialogs** — unified gradient design for all dialogs
+- **Certificate management** — view, export, replace and remove server certificate
+- **Background sync** — folders sync in background, data shows instantly from cache
 
 📋 Full changelog: [CHANGELOG_EN.md](CHANGELOG_EN.md)
 

@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.room.*
 
 @Database(
-    entities = [AccountEntity::class, EmailEntity::class, FolderEntity::class, AttachmentEntity::class],
-    version = 11,
+    entities = [AccountEntity::class, EmailEntity::class, FolderEntity::class, AttachmentEntity::class, ContactEntity::class],
+    version = 12,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -14,6 +14,7 @@ abstract class MailDatabase : RoomDatabase() {
     abstract fun emailDao(): EmailDao
     abstract fun folderDao(): FolderDao
     abstract fun attachmentDao(): AttachmentDao
+    abstract fun contactDao(): ContactDao
     
     companion object {
         @Volatile

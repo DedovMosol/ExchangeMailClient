@@ -100,6 +100,7 @@ object Strings {
     val appearance: String @Composable get() = if (isRussian()) "Внешний вид" else "Appearance"
     val syncSettings: String @Composable get() = if (isRussian()) "Синхронизация" else "Sync"
     val sync: String @Composable get() = if (isRussian()) "Синхронизация" else "Sync"
+    val serverCertificate: String @Composable get() = if (isRussian()) "Сертификат сервера" else "Server certificate"
     
     // Цветовые темы
     val colorTheme: String @Composable get() = if (isRussian()) "Цветовая тема" else "Color theme"
@@ -204,6 +205,9 @@ object Strings {
     val verifyingAccount: String @Composable get() = if (isRussian()) "Проверка учётной записи..." else "Verifying account..."
     val verifyingEmail: String @Composable get() = if (isRussian()) "Проверяем email..." else "Verifying email..."
     val emailMismatch: String @Composable get() = if (isRussian()) "Email не соответствует учётной записи" else "Email does not match account"
+    val enteredEmail: String @Composable get() = if (isRussian()) "Введённый email:" else "Entered email:"
+    val actualEmail: String @Composable get() = if (isRussian()) "Реальный email:" else "Actual email:"
+    val pleaseEnterCorrectEmail: String @Composable get() = if (isRussian()) "Пожалуйста, введите правильный email." else "Please enter the correct email."
     @Composable
     fun emailMismatchDetails(entered: String, actual: String): String = if (isRussian()) 
         "Введённый email: $entered\nРеальный email: $actual\n\nПожалуйста, введите правильный email."
@@ -464,6 +468,45 @@ object Strings {
     val themeOrange: String @Composable get() = if (isRussian()) "Оранжевая" else "Orange"
     val themeGreen: String @Composable get() = if (isRussian()) "Зелёная" else "Green"
     val themePink: String @Composable get() = if (isRussian()) "Розовая" else "Pink"
+    
+    // Контакты
+    val personalContacts: String @Composable get() = if (isRussian()) "Личные" else "Personal"
+    val organization: String @Composable get() = if (isRussian()) "Организация" else "Organization"
+    val addContact: String @Composable get() = if (isRussian()) "Добавить контакт" else "Add contact"
+    val editContact: String @Composable get() = if (isRussian()) "Редактировать контакт" else "Edit contact"
+    val deleteContact: String @Composable get() = if (isRussian()) "Удалить контакт?" else "Delete contact?"
+    val deleteContactConfirm: String @Composable get() = if (isRussian()) "Контакт будет удалён." else "Contact will be deleted."
+    val contactDeleted: String @Composable get() = if (isRussian()) "Контакт удалён" else "Contact deleted"
+    val contactSaved: String @Composable get() = if (isRussian()) "Контакт сохранён" else "Contact saved"
+    val noContacts: String @Composable get() = if (isRussian()) "Нет контактов" else "No contacts"
+    val searchContacts: String @Composable get() = if (isRussian()) "Поиск контактов..." else "Search contacts..."
+    val enterNameToSearch: String @Composable get() = if (isRussian()) "Введите имя для поиска" else "Enter name to search"
+    val firstName: String @Composable get() = if (isRussian()) "Имя" else "First name"
+    val lastName: String @Composable get() = if (isRussian()) "Фамилия" else "Last name"
+    val emailAddress: String @Composable get() = if (isRussian()) "Email" else "Email"
+    val phone: String @Composable get() = if (isRussian()) "Телефон" else "Phone"
+    val mobilePhone: String @Composable get() = if (isRussian()) "Мобильный" else "Mobile"
+    val workPhone: String @Composable get() = if (isRussian()) "Рабочий" else "Work phone"
+    val company: String @Composable get() = if (isRussian()) "Компания" else "Company"
+    val department: String @Composable get() = if (isRussian()) "Отдел" else "Department"
+    val jobTitle: String @Composable get() = if (isRussian()) "Должность" else "Job title"
+    val contactNotes: String @Composable get() = if (isRussian()) "Заметки" else "Notes"
+    val writeEmail: String @Composable get() = if (isRussian()) "Написать письмо" else "Write email"
+    val copyEmail: String @Composable get() = if (isRussian()) "Копировать email" else "Copy email"
+    val callPhone: String @Composable get() = if (isRussian()) "Позвонить" else "Call"
+    val exportContacts: String @Composable get() = if (isRussian()) "Экспорт контактов" else "Export contacts"
+    val importContacts: String @Composable get() = if (isRussian()) "Импорт контактов" else "Import contacts"
+    val exportToVCard: String @Composable get() = if (isRussian()) "Экспорт в vCard (.vcf)" else "Export to vCard (.vcf)"
+    val exportToCSV: String @Composable get() = if (isRussian()) "Экспорт в CSV" else "Export to CSV"
+    val importFromVCard: String @Composable get() = if (isRussian()) "Импорт из vCard (.vcf)" else "Import from vCard (.vcf)"
+    val importFromCSV: String @Composable get() = if (isRussian()) "Импорт из CSV" else "Import from CSV"
+    val contactsExported: String @Composable get() = if (isRussian()) "Контакты экспортированы" else "Contacts exported"
+    @Composable
+    fun contactsImported(count: Int): String = if (isRussian()) "Импортировано контактов: $count" else "Imported contacts: $count"
+    val noContactsToExport: String @Composable get() = if (isRussian()) "Нет контактов для экспорта" else "No contacts to export"
+    val selectContactsToExport: String @Composable get() = if (isRussian()) "Выберите контакты для экспорта" else "Select contacts to export"
+    val exportAll: String @Composable get() = if (isRussian()) "Экспортировать все" else "Export all"
+    val exportSelected: String @Composable get() = if (isRussian()) "Экспортировать выбранные" else "Export selected"
 }
 
 /**

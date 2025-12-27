@@ -23,6 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -347,13 +348,30 @@ fun SetupScreen(
         ) {
             // Приветственный блок для нового аккаунта
             if (!isEditing) {
+                val colorTheme = LocalColorTheme.current
+                val animationsEnabled = com.exchange.mailclient.ui.theme.LocalAnimationsEnabled.current
+                
+                // Анимация пульсации для иконки
+                val iconScale = if (animationsEnabled) {
+                    val infiniteTransition = rememberInfiniteTransition(label = "iconPulse")
+                    infiniteTransition.animateFloat(
+                        initialValue = 1f,
+                        targetValue = 1.1f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "iconScale"
+                    ).value
+                } else 1f
+                
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
                             brush = Brush.verticalGradient(
                                 colors = listOf(
-                                    Color(0xFF536DFE).copy(alpha = 0.1f),
+                                    colorTheme.gradientStart.copy(alpha = 0.1f),
                                     Color.Transparent
                                 )
                             )
@@ -367,12 +385,13 @@ fun SetupScreen(
                         Box(
                             modifier = Modifier
                                 .size(80.dp)
+                                .scale(iconScale)
                                 .clip(CircleShape)
                                 .background(
                                     brush = Brush.linearGradient(
                                         colors = listOf(
-                                            Color(0xFF7C4DFF),
-                                            Color(0xFF536DFE)
+                                            colorTheme.gradientStart,
+                                            colorTheme.gradientEnd
                                         )
                                     )
                                 ),
@@ -854,8 +873,8 @@ fun SetupScreen(
                     onCheckedChange = { acceptAllCerts = it }
                 )
                 Text(
-                    text = if (isRussian()) "Принимать самоподписанные сертификаты" 
-                           else "Accept self-signed certificates",
+                    text = if (isRussian()) "Принимать все сертификаты" 
+                           else "Accept all certificates",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.clickable { acceptAllCerts = !acceptAllCerts }
                 )

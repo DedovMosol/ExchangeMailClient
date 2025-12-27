@@ -362,7 +362,7 @@ class AccountRepository(private val context: Context) {
                 "Сервер не найден. Проверьте адрес."
             message.contains("SSL", ignoreCase = true) ||
             message.contains("certificate", ignoreCase = true) -> 
-                "Ошибка SSL. Попробуйте включить 'Принимать самоподписанные сертификаты'."
+                "Ошибка SSL. Попробуйте включить 'Принимать все сертификаты'."
             message.contains("STARTTLS", ignoreCase = true) -> 
                 "Сервер требует STARTTLS. Попробуйте другой порт."
             else -> "Ошибка $protocol: $message"

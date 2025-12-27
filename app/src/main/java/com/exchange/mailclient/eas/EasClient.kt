@@ -160,9 +160,21 @@ class EasClient(
                         SSLContext.getInstance("TLS")
                     }
                     sslContext.init(null, arrayOf(certTrustManager), SecureRandom())
+                    // Используем TlsSocketFactory для поддержки старых TLS версий
                     builder.sslSocketFactory(TlsSocketFactory(sslContext.socketFactory), certTrustManager)
                     // Для самоподписанных сертификатов hostname может не совпадать
                     builder.hostnameVerifier { _, _ -> true }
+                } else {
+                    // Сертификат не загрузился — используем системный TrustManager
+                    android.util.Log.e("EasClient", "Failed to load certificate from: $certificatePath")
+                    val systemTrustManager = createSystemTrustManager()
+                    val sslContext = try {
+                        SSLContext.getInstance("TLS", "Conscrypt")
+                    } catch (_: Exception) {
+                        SSLContext.getInstance("TLS")
+                    }
+                    sslContext.init(null, arrayOf(systemTrustManager), SecureRandom())
+                    builder.sslSocketFactory(TlsSocketFactory(sslContext.socketFactory), systemTrustManager)
                 }
             } else {
                 // Используем системный TrustManager который учитывает:
@@ -238,6 +250,7 @@ class EasClient(
     
     /**
      * SSLSocketFactory с поддержкой TLS 1.0/1.1/1.2 для Exchange 2007
+     * Также устанавливает SNI (Server Name Indication) для серверов которые его требуют
      */
     private class TlsSocketFactory(private val delegate: SSLSocketFactory) : SSLSocketFactory() {
         // Приоритет протоколов - от новых к старым, без SSLv3 (устарел и отключён)
@@ -247,28 +260,39 @@ class EasClient(
         override fun getSupportedCipherSuites(): Array<String> = delegate.supportedCipherSuites
         
         override fun createSocket(s: java.net.Socket, host: String, port: Int, autoClose: Boolean): java.net.Socket {
-            return enableTls(delegate.createSocket(s, host, port, autoClose))
+            return enableTls(delegate.createSocket(s, host, port, autoClose), host)
         }
         
         override fun createSocket(host: String, port: Int): java.net.Socket {
-            return enableTls(delegate.createSocket(host, port))
+            return enableTls(delegate.createSocket(host, port), host)
         }
         
         override fun createSocket(host: String, port: Int, localHost: java.net.InetAddress, localPort: Int): java.net.Socket {
-            return enableTls(delegate.createSocket(host, port, localHost, localPort))
+            return enableTls(delegate.createSocket(host, port, localHost, localPort), host)
         }
         
         override fun createSocket(host: java.net.InetAddress, port: Int): java.net.Socket {
-            return enableTls(delegate.createSocket(host, port))
+            return enableTls(delegate.createSocket(host, port), host.hostName)
         }
         
         override fun createSocket(address: java.net.InetAddress, port: Int, localAddress: java.net.InetAddress, localPort: Int): java.net.Socket {
-            return enableTls(delegate.createSocket(address, port, localAddress, localPort))
+            return enableTls(delegate.createSocket(address, port, localAddress, localPort), address.hostName)
         }
         
-        private fun enableTls(socket: java.net.Socket): java.net.Socket {
+        private fun enableTls(socket: java.net.Socket, hostname: String?): java.net.Socket {
             if (socket is SSLSocket) {
                 try {
+                    // Устанавливаем SNI (Server Name Indication) - критично для многих серверов
+                    if (!hostname.isNullOrEmpty()) {
+                        try {
+                            val sslParams = socket.sslParameters
+                            sslParams.serverNames = listOf(javax.net.ssl.SNIHostName(hostname))
+                            socket.sslParameters = sslParams
+                        } catch (_: Exception) {
+                            // SNI не поддерживается
+                        }
+                    }
+                    
                     // Получаем поддерживаемые протоколы
                     val supported = socket.supportedProtocols ?: emptyArray()
                     if (supported.isEmpty()) {
@@ -288,7 +312,7 @@ class EasClient(
                         socket.enabledCipherSuites = supportedCiphers
                     }
                 } catch (_: Exception) {
-                    // Если что-то пошло не так - оставляем сокет как есть
+                    // Ошибка конфигурации сокета
                 }
             }
             return socket
@@ -369,7 +393,9 @@ class EasClient(
     private fun createCertificateTrustManager(certPath: String): X509TrustManager? {
         return try {
             val certFile = java.io.File(certPath)
-            if (!certFile.exists()) return null
+            if (!certFile.exists()) {
+                return null
+            }
             
             // Загружаем сертификат
             val certFactory = java.security.cert.CertificateFactory.getInstance("X.509")
@@ -404,28 +430,33 @@ class EasClient(
                 
                 override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
                     // Для самоподписанных сертификатов — сравниваем напрямую
-                    // Проверяем что сертификат сервера совпадает с загруженным
                     if (chain.isNotEmpty()) {
                         val serverCert = chain[0]
                         
-                        // Сравниваем публичные ключи (более надёжно чем сравнение всего сертификата)
+                        // Сравниваем публичные ключи
                         if (serverCert.publicKey == certificate.publicKey) {
-                            // Проверяем что сертификат ещё действителен
                             try {
                                 serverCert.checkValidity()
-                                return // Сертификат совпадает и действителен
                             } catch (_: Exception) {
-                                // Сертификат истёк, но всё равно принимаем (пользователь сам выбрал)
-                                return
+                                // Сертификат истёк, но принимаем
                             }
+                            return
                         }
                         
                         // Альтернативная проверка — сравниваем encoded форму
                         try {
                             if (serverCert.encoded.contentEquals(certificate.encoded)) {
-                                return // Сертификаты идентичны
+                                return
                             }
                         } catch (_: Exception) {}
+                        
+                        // Проверяем всю цепочку
+                        for (cert in chain) {
+                            if (cert.publicKey == certificate.publicKey || 
+                                cert.encoded.contentEquals(certificate.encoded)) {
+                                return
+                            }
+                        }
                     }
                     
                     // Пробуем через TrustManager с нашим KeyStore
@@ -445,13 +476,13 @@ class EasClient(
                 
                 override fun getAcceptedIssuers(): Array<X509Certificate> {
                     val issuers = mutableListOf<X509Certificate>()
-                    issuers.add(certificate) // Добавляем наш сертификат как доверенный issuer
+                    issuers.add(certificate)
                     certTm?.acceptedIssuers?.let { issuers.addAll(it) }
                     systemTm?.acceptedIssuers?.let { issuers.addAll(it) }
                     return issuers.toTypedArray()
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -2112,7 +2143,9 @@ $foldersXml
                 EasResult.Error("HTTP ${response.code}: ${response.message}")
             }
         } catch (e: Exception) {
-            EasResult.Error("Ошибка: ${e.javaClass.simpleName}: ${e.message}")
+            // Добавляем информацию о сертификате для отладки SSL ошибок
+            val certInfo = if (certificatePath != null) " [cert: $certificatePath]" else ""
+            EasResult.Error("Ошибка: ${e.javaClass.simpleName}: ${e.message}$certInfo")
         }
     }
     

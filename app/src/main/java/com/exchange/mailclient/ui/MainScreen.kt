@@ -618,6 +618,11 @@ private fun HomeContent(
     val settingsRepo = remember { SettingsRepository.getInstance(context) }
     val lastSyncTime by settingsRepo.lastSyncTime.collectAsState(initial = 0L)
     
+    // Проверяем активен ли Battery Saver
+    val isBatterySaverActive = remember { settingsRepo.isBatterySaverActive() }
+    val ignoreBatterySaver by settingsRepo.ignoreBatterySaver.collectAsState(initial = false)
+    val showBatterySaverWarning = isBatterySaverActive && !ignoreBatterySaver
+    
     // Состояние для скрытия рекомендации (сохраняется при навигации, сбрасывается при перезапуске приложения)
     var isRecommendationDismissed by rememberSaveable { mutableStateOf(false) }
     
@@ -664,6 +669,39 @@ private fun HomeContent(
                             text = Strings.syncingMail,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+            }
+        }
+        
+        // Индикатор Battery Saver
+        if (showBatterySaverWarning) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.7f)
+                    ),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.BatterySaver,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = Strings.batterySaverActive,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
                         )
                     }
                 }
@@ -1160,7 +1198,7 @@ private fun HomeContent(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "v1.0.9",
+                                text = "v1.1.0",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

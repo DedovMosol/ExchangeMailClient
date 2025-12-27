@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.1.0 (27.12.2025)
+
+### New Features
+- **Contact groups** — organize contacts into folders:
+  - Create, rename and delete groups
+  - Move contacts between groups
+  - Filter contacts by groups (chips)
+  - View contacts without group
+- **Battery saver mode** — app automatically detects when Android enables battery saver:
+  - Increases sync interval to 60 minutes
+  - Shows indicator on main screen
+  - "Ignore battery saver" setting for those who need mail urgently
+
+### Bug Fixes
+- **Empty trash** — now shows real deletion progress (X / Y emails) instead of fake timer. 3 sec countdown to cancel, then real deletion with progress.
+- **User avatar color** — avatar in search and settings now changes with app color theme
+
+### Changes
+- **Exchange 2003 not supported** — removed EAS 2.5 support (Exchange 2003). Supported versions: EAS 12.0-14.1 (Exchange 2007+).
+
+---
+
 ## v1.0.9 (27.12.2025)
 
 ### New Features

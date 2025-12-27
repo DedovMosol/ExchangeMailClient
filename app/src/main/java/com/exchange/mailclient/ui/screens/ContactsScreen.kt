@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.exchange.mailclient.data.database.ContactEntity
+import com.exchange.mailclient.data.database.ContactGroupEntity
 import com.exchange.mailclient.data.database.ContactSource
 import com.exchange.mailclient.data.repository.AccountRepository
 import com.exchange.mailclient.data.repository.ContactRepository
@@ -76,10 +77,18 @@ fun ContactsScreen(
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = listOf(Strings.personalContacts, Strings.organization)
     
-    // Личные контакты
-    val localContacts by contactRepo.getContacts(accountId).collectAsState(initial = emptyList())
+    // Личные контакты - используем key чтобы пересоздавать Flow при смене accountId
+    val localContacts by remember(accountId) { contactRepo.getContacts(accountId) }.collectAsState(initial = emptyList())
     var localSearchQuery by rememberSaveable { mutableStateOf("") }
     var filteredLocalContacts by remember { mutableStateOf<List<ContactEntity>>(emptyList()) }
+    
+    // Группы контактов - используем key чтобы пересоздавать Flow при смене accountId
+    val groups by remember(accountId) { contactRepo.getGroups(accountId) }.collectAsState(initial = emptyList())
+    var selectedGroupId by rememberSaveable { mutableStateOf<String?>(null) } // null = все контакты
+    var showCreateGroupDialog by remember { mutableStateOf(false) }
+    var groupToRename by remember { mutableStateOf<ContactGroupEntity?>(null) }
+    var groupToDelete by remember { mutableStateOf<ContactGroupEntity?>(null) }
+    var showMoveToGroupDialog by remember { mutableStateOf<ContactEntity?>(null) }
     
     // GAL контакты
     var galSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -139,15 +148,21 @@ fun ContactsScreen(
     }
     
     // Фильтрация локальных контактов
-    LaunchedEffect(localContacts, localSearchQuery) {
-        filteredLocalContacts = if (localSearchQuery.isBlank()) {
-            localContacts
-        } else {
-            localContacts.filter {
-                it.displayName.contains(localSearchQuery, true) ||
-                it.email.contains(localSearchQuery, true) ||
-                it.company.contains(localSearchQuery, true)
+    LaunchedEffect(localContacts, localSearchQuery, selectedGroupId) {
+        filteredLocalContacts = localContacts.filter { contact ->
+            // Фильтр по группе
+            val matchesGroup = when (selectedGroupId) {
+                null -> true // Все контакты
+                "ungrouped" -> contact.groupId == null // Без группы
+                else -> contact.groupId == selectedGroupId
             }
+            // Фильтр по поиску
+            val matchesSearch = localSearchQuery.isBlank() || 
+                contact.displayName.contains(localSearchQuery, true) ||
+                contact.email.contains(localSearchQuery, true) ||
+                contact.company.contains(localSearchQuery, true)
+            
+            matchesGroup && matchesSearch
         }
     }
     
@@ -340,6 +355,178 @@ fun ContactsScreen(
         )
     }
 
+    // Диалог создания группы
+    if (showCreateGroupDialog) {
+        var newGroupName by remember { mutableStateOf("") }
+        val groupCreatedMsg = Strings.groupCreated
+        
+        AlertDialog(
+            onDismissRequest = { showCreateGroupDialog = false },
+            icon = { Icon(Icons.Default.CreateNewFolder, null) },
+            title = { Text(Strings.createGroup) },
+            text = {
+                OutlinedTextField(
+                    value = newGroupName,
+                    onValueChange = { newGroupName = it },
+                    label = { Text(Strings.groupName) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newGroupName.isNotBlank()) {
+                            scope.launch {
+                                contactRepo.createGroup(accountId, newGroupName)
+                                Toast.makeText(context, groupCreatedMsg, Toast.LENGTH_SHORT).show()
+                            }
+                            showCreateGroupDialog = false
+                        }
+                    },
+                    enabled = newGroupName.isNotBlank()
+                ) {
+                    Text(Strings.save)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateGroupDialog = false }) {
+                    Text(Strings.cancel)
+                }
+            }
+        )
+    }
+    
+    // Диалог переименования группы
+    groupToRename?.let { group ->
+        var newName by remember { mutableStateOf(group.name) }
+        val groupRenamedMsg = Strings.groupRenamed
+        
+        AlertDialog(
+            onDismissRequest = { groupToRename = null },
+            icon = { Icon(Icons.Default.Edit, null) },
+            title = { Text(Strings.renameGroup) },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text(Strings.groupName) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newName.isNotBlank() && newName != group.name) {
+                            scope.launch {
+                                contactRepo.renameGroup(group.id, newName)
+                                Toast.makeText(context, groupRenamedMsg, Toast.LENGTH_SHORT).show()
+                            }
+                            groupToRename = null
+                        }
+                    },
+                    enabled = newName.isNotBlank() && newName != group.name
+                ) {
+                    Text(Strings.save)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { groupToRename = null }) {
+                    Text(Strings.cancel)
+                }
+            }
+        )
+    }
+    
+    // Диалог удаления группы
+    groupToDelete?.let { group ->
+        val groupDeletedMsg = Strings.groupDeleted
+        
+        AlertDialog(
+            onDismissRequest = { groupToDelete = null },
+            icon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text(Strings.deleteGroup) },
+            text = { Text(Strings.deleteGroupConfirm) },
+            confirmButton = {
+                TextButton(onClick = {
+                    scope.launch {
+                        contactRepo.deleteGroup(group.id)
+                        if (selectedGroupId == group.id) {
+                            selectedGroupId = null
+                        }
+                        Toast.makeText(context, groupDeletedMsg, Toast.LENGTH_SHORT).show()
+                    }
+                    groupToDelete = null
+                }) {
+                    Text(Strings.delete, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { groupToDelete = null }) {
+                    Text(Strings.cancel)
+                }
+            }
+        )
+    }
+    
+    // Диалог перемещения контакта в группу
+    showMoveToGroupDialog?.let { contact ->
+        AlertDialog(
+            onDismissRequest = { showMoveToGroupDialog = null },
+            icon = { Icon(Icons.Default.Folder, null) },
+            title = { Text(Strings.moveToGroup) },
+            text = {
+                LazyColumn {
+                    // Без группы
+                    item {
+                        ListItem(
+                            headlineContent = { Text(Strings.withoutGroup) },
+                            leadingContent = { 
+                                Icon(
+                                    Icons.Default.FolderOff, 
+                                    null,
+                                    tint = if (contact.groupId == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                ) 
+                            },
+                            modifier = Modifier.clickable {
+                                scope.launch {
+                                    contactRepo.moveContactToGroup(contact.id, null)
+                                }
+                                showMoveToGroupDialog = null
+                            }
+                        )
+                    }
+                    // Группы
+                    items(groups) { group ->
+                        ListItem(
+                            headlineContent = { Text(group.name) },
+                            leadingContent = { 
+                                Icon(
+                                    Icons.Default.Folder, 
+                                    null,
+                                    tint = if (contact.groupId == group.id) MaterialTheme.colorScheme.primary else Color(group.color)
+                                ) 
+                            },
+                            modifier = Modifier.clickable {
+                                scope.launch {
+                                    contactRepo.moveContactToGroup(contact.id, group.id)
+                                }
+                                showMoveToGroupDialog = null
+                            }
+                        )
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showMoveToGroupDialog = null }) {
+                    Text(Strings.cancel)
+                }
+            }
+        )
+    }
+
     
     Scaffold(
         topBar = {
@@ -366,6 +553,17 @@ fun ContactsScreen(
                             expanded = showMoreMenu,
                             onDismissRequest = { showMoreMenu = false }
                         ) {
+                            if (selectedTab == 0) {
+                                DropdownMenuItem(
+                                    text = { Text(Strings.createGroup) },
+                                    onClick = {
+                                        showMoreMenu = false
+                                        showCreateGroupDialog = true
+                                    },
+                                    leadingIcon = { Icon(Icons.Default.CreateNewFolder, null) }
+                                )
+                                HorizontalDivider()
+                            }
                             DropdownMenuItem(
                                 text = { Text(Strings.exportContacts) },
                                 onClick = {
@@ -450,8 +648,14 @@ fun ContactsScreen(
             // Контент
             when (selectedTab) {
                 0 -> PersonalContactsList(
+                    groups = groups,
+                    selectedGroupId = selectedGroupId,
+                    onGroupSelected = { selectedGroupId = it },
+                    onGroupRename = { groupToRename = it },
+                    onGroupDelete = { groupToDelete = it },
                     groupedContacts = groupedContacts,
-                    onContactClick = { showContactDetails = it }
+                    onContactClick = { showContactDetails = it },
+                    onContactMoveToGroup = { showMoveToGroupDialog = it }
                 )
                 1 -> OrganizationContactsList(
                     query = galSearchQuery,
@@ -468,30 +672,127 @@ fun ContactsScreen(
 
 @Composable
 private fun PersonalContactsList(
+    groups: List<ContactGroupEntity>,
+    selectedGroupId: String?,
+    onGroupSelected: (String?) -> Unit,
+    onGroupRename: (ContactGroupEntity) -> Unit,
+    onGroupDelete: (ContactGroupEntity) -> Unit,
     groupedContacts: Map<Char, List<ContactEntity>>,
-    onContactClick: (ContactEntity) -> Unit
+    onContactClick: (ContactEntity) -> Unit,
+    onContactMoveToGroup: (ContactEntity) -> Unit
 ) {
-    if (groupedContacts.isEmpty()) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Default.People,
-                    null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    Strings.noContacts,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+    var expandedGroupMenu by remember { mutableStateOf<String?>(null) }
+    
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        // Фильтр по группам (горизонтальный скролл чипов)
+        item {
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Все контакты
+                item {
+                    FilterChip(
+                        selected = selectedGroupId == null,
+                        onClick = { onGroupSelected(null) },
+                        label = { Text(Strings.allMail) },
+                        leadingIcon = if (selectedGroupId == null) {
+                            { Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp)) }
+                        } else null
+                    )
+                }
+                // Группы
+                items(groups) { group ->
+                    Box {
+                        FilterChip(
+                            selected = selectedGroupId == group.id,
+                            onClick = { onGroupSelected(group.id) },
+                            label = { Text(group.name) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Folder,
+                                    null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = Color(group.color)
+                                )
+                            },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { expandedGroupMenu = group.id },
+                                    modifier = Modifier.size(18.dp)
+                                ) {
+                                    Icon(Icons.Default.MoreVert, null, modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        )
+                        DropdownMenu(
+                            expanded = expandedGroupMenu == group.id,
+                            onDismissRequest = { expandedGroupMenu = null }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(Strings.rename) },
+                                onClick = {
+                                    expandedGroupMenu = null
+                                    onGroupRename(group)
+                                },
+                                leadingIcon = { Icon(Icons.Default.Edit, null) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(Strings.delete, color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    expandedGroupMenu = null
+                                    onGroupDelete(group)
+                                },
+                                leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+                            )
+                        }
+                    }
+                }
+                // Без группы
+                item {
+                    FilterChip(
+                        selected = selectedGroupId == "ungrouped",
+                        onClick = { onGroupSelected("ungrouped") },
+                        label = { Text(Strings.withoutGroup) },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.FolderOff,
+                                null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    )
+                }
             }
         }
-    } else {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
+        
+        // Контакты
+        if (groupedContacts.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 64.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            Icons.Default.People,
+                            null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            Strings.noContacts,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        } else {
             groupedContacts.forEach { (letter, contacts) ->
                 item {
                     Text(
@@ -503,11 +804,10 @@ private fun PersonalContactsList(
                     )
                 }
                 items(contacts, key = { it.id }) { contact ->
-                    ContactItem(
-                        name = contact.displayName,
-                        email = contact.email,
-                        company = contact.company,
-                        onClick = { onContactClick(contact) }
+                    ContactItemWithGroup(
+                        contact = contact,
+                        onClick = { onContactClick(contact) },
+                        onMoveToGroup = { onContactMoveToGroup(contact) }
                     )
                 }
             }
@@ -618,6 +918,68 @@ private fun ContactItem(
                     color = Color.White,
                     fontWeight = FontWeight.Bold
                 )
+            }
+        },
+        modifier = Modifier.clickable(onClick = onClick)
+    )
+}
+
+@Composable
+private fun ContactItemWithGroup(
+    contact: ContactEntity,
+    onClick: () -> Unit,
+    onMoveToGroup: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    
+    ListItem(
+        headlineContent = {
+            Text(contact.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Column {
+                if (contact.email.isNotBlank()) {
+                    Text(contact.email, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                if (contact.company.isNotBlank()) {
+                    Text(contact.company, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(getAvatarColor(contact.displayName)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = contact.displayName.firstOrNull()?.uppercase() ?: "?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        trailingContent = {
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(Icons.Default.MoreVert, null)
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(Strings.moveToGroup) },
+                        onClick = {
+                            showMenu = false
+                            onMoveToGroup()
+                        },
+                        leadingIcon = { Icon(Icons.Default.Folder, null) }
+                    )
+                }
             }
         },
         modifier = Modifier.clickable(onClick = onClick)

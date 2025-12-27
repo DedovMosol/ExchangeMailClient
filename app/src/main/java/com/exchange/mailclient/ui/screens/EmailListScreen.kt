@@ -432,10 +432,12 @@ fun EmailListScreen(
                                 emailIds = allEmailIds,
                                 message = deletingMessage,
                                 scope = scope
-                            ) { emailIds ->
-                                // Этот callback вызывается когда прогресс завершён
+                            ) { emailIds, onProgress ->
+                                // Удаление с реальным прогрессом
                                 val result = withContext(Dispatchers.IO) {
-                                    mailRepo.deleteEmailsPermanently(emailIds)
+                                    mailRepo.deleteEmailsPermanentlyWithProgress(emailIds) { deleted, total ->
+                                        onProgress(deleted, total)
+                                    }
                                 }
                                 when (result) {
                                     is EasResult.Success -> {

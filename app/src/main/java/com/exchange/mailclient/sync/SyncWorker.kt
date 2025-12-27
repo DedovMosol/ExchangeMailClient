@@ -295,10 +295,16 @@ class SyncWorker(
             // Применяем ночной режим
             val nightModeEnabled = settingsRepo.getNightModeEnabledSync()
             val isNightTime = settingsRepo.isNightTime()
-            val effectiveInterval = if (nightModeEnabled && isNightTime && minInterval > 0) {
-                maxOf(NIGHT_MODE_INTERVAL.toInt(), minInterval)
-            } else {
-                minInterval
+            
+            // Применяем Battery Saver (увеличиваем интервал до 60 мин)
+            val batterySaverActive = settingsRepo.shouldApplyBatterySaverRestrictions()
+            
+            val effectiveInterval = when {
+                // Battery Saver имеет приоритет
+                batterySaverActive && minInterval > 0 -> maxOf(NIGHT_MODE_INTERVAL.toInt(), minInterval)
+                // Затем ночной режим
+                nightModeEnabled && isNightTime && minInterval > 0 -> maxOf(NIGHT_MODE_INTERVAL.toInt(), minInterval)
+                else -> minInterval
             }
             
             val wifiOnly = settingsRepo.syncOnWifiOnly.let { 

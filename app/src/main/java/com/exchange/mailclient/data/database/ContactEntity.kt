@@ -27,6 +27,7 @@ data class ContactEntity(
     @PrimaryKey val id: String,  // accountId_serverId или UUID для локальных
     val accountId: Long,
     val serverId: String? = null, // null для локальных контактов
+    val groupId: String? = null,  // ID группы (null = без группы)
     val displayName: String,
     val firstName: String = "",
     val lastName: String = "",

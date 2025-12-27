@@ -17,7 +17,7 @@ import android.util.Base64
 
 /**
  * Exchange ActiveSync клиент
- * Поддерживает EAS 2.5, 12.0, 12.1 для Exchange 2007
+ * Поддерживает EAS 12.0, 12.1, 14.0, 14.1 для Exchange 2007+
  */
 class EasClient(
     serverUrl: String,
@@ -39,8 +39,8 @@ class EasClient(
     
     // Версия EAS - по умолчанию 12.1, но может быть изменена после OPTIONS
     private var easVersion = "12.1"
-    // Приоритет версий (от новых к старым)
-    private val supportedVersions = listOf("14.1", "14.0", "12.1", "12.0", "2.5")
+    // Приоритет версий (от новых к старым) - Exchange 2007+
+    private val supportedVersions = listOf("14.1", "14.0", "12.1", "12.0")
     // Версии поддерживаемые сервером (заполняется после OPTIONS)
     private var serverSupportedVersions: List<String> = emptyList()
     // Флаг что версия уже определена

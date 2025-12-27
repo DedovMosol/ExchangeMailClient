@@ -4,14 +4,14 @@
 
 Android mail client with Microsoft Exchange Server 2007+ (ActiveSync), IMAP and POP3 support.
 
-**Version:** 1.0.9  
+**Version:** 1.1.0  
 **Developer:** DedovMosol  
 **Telegram:** [@i_wantout](https://t.me/i_wantout)  
 **Email:** andreyid@outlook.com
 
 ## 🌟 Features
 
-- 📧 **Exchange ActiveSync** — full EAS 2.5-14.1 support
+- 📧 **Exchange ActiveSync** — full EAS 12.0-14.1 support (Exchange 2007+)
 - 📬 **IMAP/POP3** — works with any mail server (beta)
 - 🔒 **Exchange 2007 compatibility** — TLS 1.0/1.1 support via Conscrypt
 - 🌍 **Two languages** — 🇷🇺 Russian / 🇬🇧 English
@@ -42,13 +42,11 @@ Android mail client with Microsoft Exchange Server 2007+ (ActiveSync), IMAP and 
 | Account signature | ✅ |
 | Read/delivery receipt request (MDN/DSN) | ✅ |
 
-## 🆕 What's New in v1.0.9
+## 🆕 What's New in v1.1.0
 
-- **Contacts** — full contact management system with import/export
-- **Email autocomplete** — suggestions from contacts, history and GAL when typing email
-- **Styled dialogs** — unified gradient design for all dialogs
-- **Certificate management** — view, export, replace and remove server certificate
-- **Background sync** — folders sync in background, data shows instantly from cache
+- **Contact groups** — organize contacts into folders with filtering
+- **Real deletion progress** — trash cleanup shows X / Y emails
+- **Avatar color** — user avatar changes with app color theme
 
 📋 Full changelog: [CHANGELOG_EN.md](CHANGELOG_EN.md)
 

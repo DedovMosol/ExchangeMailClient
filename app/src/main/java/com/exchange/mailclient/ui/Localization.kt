@@ -159,6 +159,14 @@ object Strings {
         "23:00-7:00 синхронизация каждые 60 мин" 
         else "23:00-7:00 sync every 60 min"
     
+    // Режим экономии батареи
+    val batterySaverMode: String @Composable get() = if (isRussian()) "Режим экономии батареи" else "Battery saver mode"
+    val batterySaverActive: String @Composable get() = if (isRussian()) "Активен режим экономии" else "Battery saver active"
+    val ignoreBatterySaver: String @Composable get() = if (isRussian()) "Игнорировать режим экономии" else "Ignore battery saver"
+    val ignoreBatterySaverDesc: String @Composable get() = if (isRussian()) 
+        "Синхронизировать почту даже в режиме экономии батареи" 
+        else "Sync mail even in battery saver mode"
+    
     // Интервалы синхронизации
     val syncOff: String @Composable get() = if (isRussian()) "Выключено" else "Off"
     val syncInterval: String @Composable get() = if (isRussian()) "Интервал синхронизации" else "Sync interval"
@@ -507,6 +515,33 @@ object Strings {
     val selectContactsToExport: String @Composable get() = if (isRussian()) "Выберите контакты для экспорта" else "Select contacts to export"
     val exportAll: String @Composable get() = if (isRussian()) "Экспортировать все" else "Export all"
     val exportSelected: String @Composable get() = if (isRussian()) "Экспортировать выбранные" else "Export selected"
+    
+    // Группы контактов
+    val contactGroups: String @Composable get() = if (isRussian()) "Группы" else "Groups"
+    val createGroup: String @Composable get() = if (isRussian()) "Создать группу" else "Create group"
+    val groupName: String @Composable get() = if (isRussian()) "Название группы" else "Group name"
+    val renameGroup: String @Composable get() = if (isRussian()) "Переименовать группу" else "Rename group"
+    val deleteGroup: String @Composable get() = if (isRussian()) "Удалить группу?" else "Delete group?"
+    val deleteGroupConfirm: String @Composable get() = if (isRussian()) "Группа будет удалена. Контакты останутся без группы." else "Group will be deleted. Contacts will remain without group."
+    val groupDeleted: String @Composable get() = if (isRussian()) "Группа удалена" else "Group deleted"
+    val groupCreated: String @Composable get() = if (isRussian()) "Группа создана" else "Group created"
+    val groupRenamed: String @Composable get() = if (isRussian()) "Группа переименована" else "Group renamed"
+    val noGroups: String @Composable get() = if (isRussian()) "Нет групп" else "No groups"
+    val withoutGroup: String @Composable get() = if (isRussian()) "Без группы" else "Without group"
+    val moveToGroup: String @Composable get() = if (isRussian()) "Переместить в группу" else "Move to group"
+    val removeFromGroup: String @Composable get() = if (isRussian()) "Убрать из группы" else "Remove from group"
+    val selectGroup: String @Composable get() = if (isRussian()) "Выберите группу" else "Select group"
+    val groupColor: String @Composable get() = if (isRussian()) "Цвет группы" else "Group color"
+    @Composable
+    fun contactsCount(count: Int): String = if (isRussian()) {
+        when {
+            count % 10 == 1 && count % 100 != 11 -> "$count контакт"
+            count % 10 in 2..4 && count % 100 !in 12..14 -> "$count контакта"
+            else -> "$count контактов"
+        }
+    } else {
+        if (count == 1) "$count contact" else "$count contacts"
+    }
 }
 
 /**

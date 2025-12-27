@@ -56,6 +56,10 @@ fun SettingsScreen(
     val syncOnWifiOnly by settingsRepo.syncOnWifiOnly.collectAsState(initial = false)
     val notificationsEnabled by settingsRepo.notificationsEnabled.collectAsState(initial = true)
     val nightModeEnabled by settingsRepo.nightModeEnabled.collectAsState(initial = false)
+    val ignoreBatterySaver by settingsRepo.ignoreBatterySaver.collectAsState(initial = false)
+    
+    // Проверяем активен ли Battery Saver
+    val isBatterySaverActive = remember { settingsRepo.isBatterySaverActive() }
     
     // Настройки языка
     val currentLanguage = LocalLanguage.current
@@ -528,6 +532,33 @@ fun SettingsScreen(
                 )
             }
             
+            // Игнорировать режим экономии батареи
+            item {
+                ListItem(
+                    headlineContent = { Text(Strings.ignoreBatterySaver) },
+                    supportingContent = { 
+                        Text(
+                            if (isBatterySaverActive && !ignoreBatterySaver) 
+                                Strings.batterySaverActive 
+                            else 
+                                Strings.ignoreBatterySaverDesc
+                        ) 
+                    },
+                    leadingContent = { Icon(Icons.Default.BatterySaver, null) },
+                    trailingContent = {
+                        Switch(
+                            checked = ignoreBatterySaver,
+                            onCheckedChange = { ignore ->
+                                scope.launch {
+                                    settingsRepo.setIgnoreBatterySaver(ignore)
+                                    SyncWorker.scheduleWithNightMode(context)
+                                }
+                            }
+                        )
+                    }
+                )
+            }
+            
             item {
                 ListItem(
                     headlineContent = { Text(Strings.notifications) },
@@ -613,7 +644,7 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("Exchange Mail Client") },
-                    supportingContent = { Text("${Strings.version} 1.0.9") },
+                    supportingContent = { Text("${Strings.version} 1.1.0") },
                     leadingContent = { Icon(Icons.Default.Info, null) }
                 )
             }

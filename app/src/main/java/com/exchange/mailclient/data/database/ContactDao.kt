@@ -82,6 +82,20 @@ interface ContactDao {
     @Query("DELETE FROM contacts WHERE accountId = :accountId AND source = :source")
     suspend fun deleteByAccountAndSource(accountId: Long, source: ContactSource)
     
+    // === Группы ===
+    
+    @Query("SELECT * FROM contacts WHERE accountId = :accountId AND groupId = :groupId ORDER BY displayName COLLATE NOCASE")
+    fun getContactsByGroup(accountId: Long, groupId: String): Flow<List<ContactEntity>>
+    
+    @Query("SELECT * FROM contacts WHERE accountId = :accountId AND groupId IS NULL ORDER BY displayName COLLATE NOCASE")
+    fun getContactsWithoutGroup(accountId: Long): Flow<List<ContactEntity>>
+    
+    @Query("UPDATE contacts SET groupId = :groupId, updatedAt = :timestamp WHERE id = :contactId")
+    suspend fun moveToGroup(contactId: String, groupId: String?, timestamp: Long = System.currentTimeMillis())
+    
+    @Query("UPDATE contacts SET groupId = NULL, updatedAt = :timestamp WHERE groupId = :groupId")
+    suspend fun removeAllFromGroup(groupId: String, timestamp: Long = System.currentTimeMillis())
+    
     // === Статистика ===
     
     @Query("SELECT COUNT(*) FROM contacts WHERE accountId = :accountId")

@@ -36,6 +36,7 @@ class SettingsRepository private constructor(private val context: Context) {
         val LANGUAGE = stringPreferencesKey("app_language")
         val FONT_SIZE = stringPreferencesKey("font_size")
         val NIGHT_MODE_ENABLED = booleanPreferencesKey("night_mode_enabled")
+        val IGNORE_BATTERY_SAVER = booleanPreferencesKey("ignore_battery_saver")
         val LAST_SYNC_TIME = longPreferencesKey("last_sync_time")
         val LAST_NOTIFICATION_CHECK_TIME = longPreferencesKey("last_notification_check_time")
         val COLOR_THEME = stringPreferencesKey("color_theme")
@@ -104,6 +105,39 @@ class SettingsRepository private constructor(private val context: Context) {
     fun isNightTime(): Boolean {
         val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
         return hour >= 23 || hour < 7
+    }
+    
+    // Игнорировать режим экономии батареи (для тех кому важна почта)
+    val ignoreBatterySaver: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.IGNORE_BATTERY_SAVER] ?: false
+    }
+    
+    suspend fun setIgnoreBatterySaver(ignore: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.IGNORE_BATTERY_SAVER] = ignore
+        }
+    }
+    
+    fun getIgnoreBatterySaverSync(): Boolean {
+        return runBlocking {
+            context.dataStore.data.first()[Keys.IGNORE_BATTERY_SAVER] ?: false
+        }
+    }
+    
+    /**
+     * Проверяет, активен ли режим экономии батареи Android
+     */
+    fun isBatterySaverActive(): Boolean {
+        val powerManager = context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+        return powerManager?.isPowerSaveMode == true
+    }
+    
+    /**
+     * Проверяет, нужно ли применять ограничения Battery Saver
+     * Возвращает true если Battery Saver активен И пользователь НЕ игнорирует его
+     */
+    fun shouldApplyBatterySaverRestrictions(): Boolean {
+        return isBatterySaverActive() && !getIgnoreBatterySaverSync()
     }
     
     val fontSize: Flow<FontSize> = context.dataStore.data.map { prefs ->

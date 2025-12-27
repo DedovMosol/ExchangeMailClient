@@ -13,79 +13,105 @@ import com.exchange.mailclient.ui.Strings
 import kotlinx.coroutines.*
 
 /**
- * Состояние отложенного удаления
+ * Состояние удаления
  */
 data class DeletionState(
     val isActive: Boolean = false,
-    val emailIds: List<String> = emptyList(),
+    val totalCount: Int = 0,
+    val deletedCount: Int = 0,
     val progress: Float = 0f,
-    val message: String = ""
+    val message: String = "",
+    val phase: DeletionPhase = DeletionPhase.COUNTDOWN
 )
 
+enum class DeletionPhase {
+    COUNTDOWN,  // Обратный отсчёт (можно отменить)
+    DELETING    // Реальное удаление (нельзя отменить)
+}
+
 /**
- * Контроллер отложенного удаления
+ * Контроллер удаления с реальным прогрессом
  */
 class DeletionController {
     var state by mutableStateOf(DeletionState())
         private set
     
-    private var deletionJob: Job? = null
-    private var onDeleteConfirmed: (suspend (List<String>) -> Unit)? = null
+    private var countdownJob: Job? = null
+    private var isCancelled = false
     
     /**
-     * Запускает отложенное удаление
+     * Запускает удаление с обратным отсчётом
      * @param emailIds список ID писем для удаления
      * @param message сообщение для отображения
-     * @param onConfirmed callback который вызывается когда удаление подтверждено (прогресс завершён)
+     * @param onDelete функция удаления с callback прогресса
      */
     fun startDeletion(
         emailIds: List<String>,
         message: String,
         scope: CoroutineScope,
-        onConfirmed: suspend (List<String>) -> Unit
+        onDelete: suspend (List<String>, onProgress: (deleted: Int, total: Int) -> Unit) -> Unit
     ) {
         // Отменяем предыдущее удаление если было
         cancel()
+        isCancelled = false
         
-        onDeleteConfirmed = onConfirmed
         state = DeletionState(
             isActive = true,
-            emailIds = emailIds,
+            totalCount = emailIds.size,
+            deletedCount = 0,
             progress = 0f,
-            message = message
+            message = message,
+            phase = DeletionPhase.COUNTDOWN
         )
         
-        // Время зависит от количества писем: минимум 2 сек, максимум 8 сек
-        // 100мс на письмо, но не меньше 2000мс и не больше 8000мс
-        val totalTimeMs = (emailIds.size * 100L).coerceIn(2000L, 8000L)
-        val stepMs = 50L // Обновляем прогресс каждые 50мс
-        val steps = (totalTimeMs / stepMs).toInt()
+        // Обратный отсчёт: 3 секунды (можно отменить)
+        val countdownMs = 3000L
+        val stepMs = 50L
+        val steps = (countdownMs / stepMs).toInt()
         
-        deletionJob = scope.launch {
+        countdownJob = scope.launch {
+            // Фаза 1: Обратный отсчёт
             for (i in 1..steps) {
+                if (isCancelled) return@launch
                 delay(stepMs)
                 state = state.copy(progress = i.toFloat() / steps)
             }
             
-            // Прогресс завершён — выполняем реальное удаление
-            state = state.copy(progress = 1f)
-            onDeleteConfirmed?.invoke(emailIds)
+            if (isCancelled) return@launch
             
-            // Небольшая задержка перед скрытием
-            delay(300)
+            // Фаза 2: Реальное удаление
+            state = state.copy(
+                phase = DeletionPhase.DELETING,
+                progress = 0f,
+                deletedCount = 0
+            )
+            
+            // Выполняем удаление с callback прогресса
+            onDelete(emailIds) { deleted, total ->
+                if (!isCancelled) {
+                    state = state.copy(
+                        deletedCount = deleted,
+                        progress = if (total > 0) deleted.toFloat() / total else 1f
+                    )
+                }
+            }
+            
+            // Завершено
+            delay(500)
             state = DeletionState()
-            onDeleteConfirmed = null
         }
     }
     
     /**
-     * Отменяет удаление
+     * Отменяет удаление (только в фазе обратного отсчёта)
      */
     fun cancel() {
-        deletionJob?.cancel()
-        deletionJob = null
-        state = DeletionState()
-        onDeleteConfirmed = null
+        if (state.phase == DeletionPhase.COUNTDOWN) {
+            isCancelled = true
+            countdownJob?.cancel()
+            countdownJob = null
+            state = DeletionState()
+        }
     }
 }
 
@@ -104,7 +130,6 @@ fun DeletionProgressBar(
 ) {
     val state = controller.state
     
-    // Показываем только когда активно
     if (state.isActive) {
         Surface(
             modifier = modifier.fillMaxWidth(),
@@ -130,31 +155,36 @@ fun DeletionProgressBar(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${(state.progress * 100).toInt()}%",
+                            text = when (state.phase) {
+                                DeletionPhase.COUNTDOWN -> "${(state.progress * 100).toInt()}%"
+                                DeletionPhase.DELETING -> "${state.deletedCount} / ${state.totalCount}"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.7f)
                         )
                     }
                     
-                    TextButton(
-                        onClick = { controller.cancel() },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    ) {
-                        Icon(
-                            Icons.Default.Close,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(Strings.cancel)
+                    // Кнопка отмены только в фазе обратного отсчёта
+                    if (state.phase == DeletionPhase.COUNTDOWN) {
+                        TextButton(
+                            onClick = { controller.cancel() },
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(Strings.cancel)
+                        }
                     }
                 }
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Прогресс-бар
                 LinearProgressIndicator(
                     progress = { state.progress },
                     modifier = Modifier

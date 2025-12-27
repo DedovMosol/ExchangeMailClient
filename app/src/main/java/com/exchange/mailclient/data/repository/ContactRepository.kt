@@ -16,6 +16,7 @@ class ContactRepository(context: Context) {
     
     private val database = MailDatabase.getInstance(context)
     private val contactDao = database.contactDao()
+    private val groupDao = database.contactGroupDao()
     private val accountRepo = AccountRepository(context)
     
     // === Получение контактов ===
@@ -107,6 +108,59 @@ class ContactRepository(context: Context) {
     
     suspend fun deleteContact(id: String) {
         contactDao.deleteById(id)
+    }
+    
+    // === Группы контактов ===
+    
+    fun getGroups(accountId: Long): Flow<List<ContactGroupEntity>> {
+        return groupDao.getGroupsByAccount(accountId)
+    }
+    
+    suspend fun getGroupsList(accountId: Long): List<ContactGroupEntity> {
+        return groupDao.getGroupsByAccountList(accountId)
+    }
+    
+    fun getContactsByGroup(accountId: Long, groupId: String): Flow<List<ContactEntity>> {
+        return contactDao.getContactsByGroup(accountId, groupId)
+    }
+    
+    fun getContactsWithoutGroup(accountId: Long): Flow<List<ContactEntity>> {
+        return contactDao.getContactsWithoutGroup(accountId)
+    }
+    
+    fun getGroupContactCount(groupId: String): Flow<Int> {
+        return groupDao.getContactCountFlow(groupId)
+    }
+    
+    suspend fun createGroup(accountId: Long, name: String, color: Int = 0xFF1976D2.toInt()): ContactGroupEntity {
+        val id = UUID.randomUUID().toString()
+        val group = ContactGroupEntity(
+            id = id,
+            accountId = accountId,
+            name = name,
+            color = color
+        )
+        groupDao.insert(group)
+        return group
+    }
+    
+    suspend fun renameGroup(groupId: String, newName: String) {
+        groupDao.rename(groupId, newName)
+    }
+    
+    suspend fun updateGroupColor(groupId: String, color: Int) {
+        groupDao.updateColor(groupId, color)
+    }
+    
+    suspend fun deleteGroup(groupId: String) {
+        // Сначала убираем все контакты из группы
+        contactDao.removeAllFromGroup(groupId)
+        // Затем удаляем группу
+        groupDao.deleteById(groupId)
+    }
+    
+    suspend fun moveContactToGroup(contactId: String, groupId: String?) {
+        contactDao.moveToGroup(contactId, groupId)
     }
     
     // === Автодополнение ===

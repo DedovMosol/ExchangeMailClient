@@ -377,6 +377,13 @@ class PushService : Service() {
                         continue
                     }
                     
+                    // При Battery Saver увеличиваем heartbeat до максимума
+                    val effectiveHeartbeat = if (settingsRepo.shouldApplyBatterySaverRestrictions()) {
+                        MAX_HEARTBEAT
+                    } else {
+                        heartbeat
+                    }
+                    
                     if (pingNotSupported) {
                         val minInterval = SyncWorker.getMinSyncInterval(applicationContext)
                         val intervalMinutes = if (minInterval > 0) minInterval else 5
@@ -385,7 +392,7 @@ class PushService : Service() {
                     }
                     
                     val startTime = System.currentTimeMillis()
-                    val result = doPing(account, heartbeat)
+                    val result = doPing(account, effectiveHeartbeat)
                     val elapsed = System.currentTimeMillis() - startTime
                     
                     if (elapsed < 10_000 && result == STATUS_EXPIRED) {

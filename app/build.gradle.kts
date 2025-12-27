@@ -12,8 +12,8 @@ android {
         applicationId = "com.exchange.mailclient"
         minSdk = 26  // Android 8.0
         targetSdk = 35  // Android 15
-        versionCode = 9
-        versionName = "1.0.9"
+        versionCode = 10
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         

@@ -825,6 +825,89 @@ class MailRepository(context: Context) {
     }
     
     /**
+     * Окончательное удаление писем с callback прогресса
+     */
+    suspend fun deleteEmailsPermanentlyWithProgress(
+        emailIds: List<String>,
+        onProgress: (deleted: Int, total: Int) -> Unit
+    ): EasResult<Int> {
+        if (emailIds.isEmpty()) return EasResult.Success(0)
+        
+        val firstEmail = emailDao.getEmail(emailIds.first())
+            ?: return EasResult.Error("Email not found")
+        
+        val account = accountRepo.getAccount(firstEmail.accountId)
+            ?: return EasResult.Error("Account not found")
+        
+        val affectedFolderIds = mutableSetOf<String>()
+        val total = emailIds.size
+        var deletedCount = 0
+        
+        if (AccountType.valueOf(account.accountType) != AccountType.EXCHANGE) {
+            // Для не-Exchange просто удаляем локально
+            emailIds.forEachIndexed { index, emailId ->
+                val email = emailDao.getEmail(emailId)
+                if (email != null) {
+                    affectedFolderIds.add(email.folderId)
+                }
+                attachmentDao.deleteByEmail(emailId)
+                emailDao.delete(emailId)
+                deletedCount++
+                onProgress(deletedCount, total)
+            }
+            // Обновляем счётчики
+            for (folderId in affectedFolderIds) {
+                val totalCount = emailDao.getCountByFolder(folderId)
+                val unreadCount = emailDao.getUnreadCount(folderId)
+                folderDao.updateCounts(folderId, unreadCount, totalCount)
+            }
+            return EasResult.Success(deletedCount)
+        }
+        
+        val client = accountRepo.createEasClient(firstEmail.accountId)
+            ?: return EasResult.Error("Failed to create client")
+        
+        for ((index, emailId) in emailIds.withIndex()) {
+            val email = emailDao.getEmail(emailId) ?: continue
+            affectedFolderIds.add(email.folderId)
+            
+            val folderServerId = if (email.serverId.contains(":")) {
+                email.serverId.substringBefore(":")
+            } else {
+                email.folderId.substringAfter("_")
+            }
+            
+            val folder = folderDao.getFolder(email.folderId)
+            val syncKey = folder?.syncKey ?: "0"
+            
+            if (syncKey == "0") {
+                onProgress(index + 1, total)
+                continue
+            }
+            
+            when (val result = client.deleteEmailPermanently(folderServerId, email.serverId, syncKey)) {
+                is EasResult.Success -> {
+                    folderDao.updateSyncKey(email.folderId, result.data)
+                    attachmentDao.deleteByEmail(emailId)
+                    emailDao.delete(emailId)
+                    deletedCount++
+                }
+                is EasResult.Error -> { }
+            }
+            onProgress(index + 1, total)
+        }
+        
+        // Обновляем счётчики затронутых папок
+        for (folderId in affectedFolderIds) {
+            val totalCount = emailDao.getCountByFolder(folderId)
+            val unreadCount = emailDao.getUnreadCount(folderId)
+            folderDao.updateCounts(folderId, unreadCount, totalCount)
+        }
+        
+        return EasResult.Success(deletedCount)
+    }
+    
+    /**
      * Отправка отчёта о прочтении (MDN)
      */
     suspend fun sendMdn(emailId: String): EasResult<Boolean> {

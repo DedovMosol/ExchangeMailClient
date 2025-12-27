@@ -512,7 +512,11 @@ class PushService : Service() {
     )
     
     private suspend fun syncAccount(account: AccountEntity) {
-        val lastNotificationCheck = settingsRepo.getLastNotificationCheckTimeSync()
+        var lastNotificationCheck = settingsRepo.getLastNotificationCheckTimeSync()
+        // При первом запуске не показываем уведомления для старых писем
+        if (lastNotificationCheck == 0L) {
+            lastNotificationCheck = System.currentTimeMillis() - 60_000
+        }
         
         val folders = database.folderDao().getFoldersByAccountList(account.id)
             .filter { it.type in listOf(2, 3, 4, 5, 6) }

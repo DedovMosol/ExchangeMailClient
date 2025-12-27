@@ -31,13 +31,17 @@ enum class DeletionPhase {
 
 /**
  * Контроллер удаления с реальным прогрессом
+ * Использует собственный scope чтобы удаление продолжалось даже при выходе с экрана
  */
 class DeletionController {
     var state by mutableStateOf(DeletionState())
         private set
     
-    private var countdownJob: Job? = null
+    private var deletionJob: Job? = null
     private var isCancelled = false
+    
+    // Собственный scope для удаления (не зависит от UI)
+    private val deletionScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
     /**
      * Запускает удаление с обратным отсчётом
@@ -48,7 +52,7 @@ class DeletionController {
     fun startDeletion(
         emailIds: List<String>,
         message: String,
-        scope: CoroutineScope,
+        scope: CoroutineScope, // Игнорируется, используем собственный scope
         onDelete: suspend (List<String>, onProgress: (deleted: Int, total: Int) -> Unit) -> Unit
     ) {
         // Отменяем предыдущее удаление если было
@@ -69,36 +73,40 @@ class DeletionController {
         val stepMs = 50L
         val steps = (countdownMs / stepMs).toInt()
         
-        countdownJob = scope.launch {
-            // Фаза 1: Обратный отсчёт
-            for (i in 1..steps) {
-                if (isCancelled) return@launch
-                delay(stepMs)
-                state = state.copy(progress = i.toFloat() / steps)
-            }
-            
-            if (isCancelled) return@launch
-            
-            // Фаза 2: Реальное удаление
-            state = state.copy(
-                phase = DeletionPhase.DELETING,
-                progress = 0f,
-                deletedCount = 0
-            )
-            
-            // Выполняем удаление с callback прогресса
-            onDelete(emailIds) { deleted, total ->
-                if (!isCancelled) {
-                    state = state.copy(
-                        deletedCount = deleted,
-                        progress = if (total > 0) deleted.toFloat() / total else 1f
-                    )
+        // Используем собственный scope чтобы удаление не прерывалось при навигации
+        deletionJob = deletionScope.launch {
+            try {
+                // Фаза 1: Обратный отсчёт
+                for (i in 1..steps) {
+                    if (isCancelled) return@launch
+                    delay(stepMs)
+                    state = state.copy(progress = i.toFloat() / steps)
                 }
+                
+                if (isCancelled) return@launch
+                
+                // Фаза 2: Реальное удаление
+                state = state.copy(
+                    phase = DeletionPhase.DELETING,
+                    progress = 0f,
+                    deletedCount = 0
+                )
+                
+                // Выполняем удаление с callback прогресса
+                onDelete(emailIds) { deleted, total ->
+                    if (!isCancelled) {
+                        state = state.copy(
+                            deletedCount = deleted,
+                            progress = if (total > 0) deleted.toFloat() / total else 1f
+                        )
+                    }
+                }
+                
+                // Завершено
+                delay(500)
+            } finally {
+                state = DeletionState()
             }
-            
-            // Завершено
-            delay(500)
-            state = DeletionState()
         }
     }
     
@@ -108,8 +116,8 @@ class DeletionController {
     fun cancel() {
         if (state.phase == DeletionPhase.COUNTDOWN) {
             isCancelled = true
-            countdownJob?.cancel()
-            countdownJob = null
+            deletionJob?.cancel()
+            deletionJob = null
             state = DeletionState()
         }
     }

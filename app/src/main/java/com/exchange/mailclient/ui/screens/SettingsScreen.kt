@@ -644,7 +644,7 @@ fun SettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("Exchange Mail Client") },
-                    supportingContent = { Text("${Strings.version} 1.1.0") },
+                    supportingContent = { Text("${Strings.version} 1.1.1") },
                     leadingContent = { Icon(Icons.Default.Info, null) }
                 )
             }

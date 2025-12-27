@@ -1035,7 +1035,7 @@ private fun ContactEditDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 OutlinedTextField(
                     value = displayName,
@@ -1067,20 +1067,23 @@ private fun ContactEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text(Strings.phone) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = mobilePhone,
-                    onValueChange = { mobilePhone = it },
-                    label = { Text(Strings.mobilePhone) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Телефоны в ряд
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = it },
+                        label = { Text(Strings.phone) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = mobilePhone,
+                        onValueChange = { mobilePhone = it },
+                        label = { Text(Strings.mobilePhone) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 OutlinedTextField(
                     value = workPhone,
                     onValueChange = { workPhone = it },
@@ -1088,20 +1091,23 @@ private fun ContactEditDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = company,
-                    onValueChange = { company = it },
-                    label = { Text(Strings.company) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = department,
-                    onValueChange = { department = it },
-                    label = { Text(Strings.department) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // Компания и отдел в ряд
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = company,
+                        onValueChange = { company = it },
+                        label = { Text(Strings.company) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = department,
+                        onValueChange = { department = it },
+                        label = { Text(Strings.department) },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 OutlinedTextField(
                     value = jobTitle,
                     onValueChange = { jobTitle = it },
@@ -1113,27 +1119,33 @@ private fun ContactEditDialog(
                     value = notes,
                     onValueChange = { notes = it },
                     label = { Text(Strings.contactNotes) },
-                    maxLines = 3,
+                    singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                
+                // Кнопки в разных сторонах
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(Strings.cancel)
+                    }
+                    TextButton(
+                        onClick = {
+                            val name = displayName.ifBlank { "$firstName $lastName".trim().ifBlank { email } }
+                            onSave(name, email, firstName, lastName, phone, mobilePhone, workPhone, company, department, jobTitle, notes)
+                        },
+                        enabled = displayName.isNotBlank() || email.isNotBlank() || firstName.isNotBlank() || lastName.isNotBlank()
+                    ) {
+                        Text(Strings.save)
+                    }
+                }
             }
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val name = displayName.ifBlank { "$firstName $lastName".trim().ifBlank { email } }
-                    onSave(name, email, firstName, lastName, phone, mobilePhone, workPhone, company, department, jobTitle, notes)
-                },
-                enabled = displayName.isNotBlank() || email.isNotBlank() || firstName.isNotBlank() || lastName.isNotBlank()
-            ) {
-                Text(Strings.save)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(Strings.cancel)
-            }
-        }
+        confirmButton = {},
+        dismissButton = {}
     )
 }
 
@@ -1204,56 +1216,127 @@ private fun ContactDetailsDialog(
             }
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Email
                 if (email.isNotBlank()) {
-                    DetailRow(Icons.Default.Email, email) {
-                        Row {
-                            TextButton(onClick = { onWriteEmail(email) }) {
-                                Text(Strings.writeEmail)
-                            }
-                            TextButton(onClick = { onCopyEmail(email) }) {
-                                Text(Strings.copyEmail)
-                            }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Email, null, 
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(email, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { onWriteEmail(email) },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.Send, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(Strings.writeEmail, style = MaterialTheme.typography.labelMedium)
+                        }
+                        OutlinedButton(
+                            onClick = { onCopyEmail(email) },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(Strings.copyEmail, style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
+                
+                // Телефон
                 if (phone.isNotBlank()) {
-                    DetailRow(Icons.Default.Phone, phone) {
-                        TextButton(onClick = { onCall(phone) }) {
-                            Text(Strings.callPhone)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Phone, null, 
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(phone, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { onCall(phone) }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Call, Strings.callPhone, 
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp))
                         }
                     }
                 }
+                
+                // Мобильный
                 if (mobilePhone.isNotBlank()) {
-                    DetailRow(Icons.Default.PhoneAndroid, mobilePhone) {
-                        TextButton(onClick = { onCall(mobilePhone) }) {
-                            Text(Strings.callPhone)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.PhoneAndroid, null, 
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(mobilePhone, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { onCall(mobilePhone) }, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Call, Strings.callPhone, 
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp))
                         }
                     }
                 }
+                
+                // Компания
                 if (company.isNotBlank()) {
-                    DetailRow(Icons.Default.Business, company)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Business, null, 
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(company, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
+                
+                // Должность
                 if (jobTitle.isNotBlank()) {
-                    DetailRow(Icons.Default.Work, jobTitle)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Work, null, 
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(jobTitle, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         },
         confirmButton = {
-            if (isLocal) {
-                Row {
-                    TextButton(onClick = onEdit) {
-                        Text(Strings.edit)
-                    }
-                    TextButton(onClick = onDelete) {
-                        Text(Strings.delete, color = MaterialTheme.colorScheme.error)
+            // Кнопки действий справа
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Написать (если есть email)
+                if (email.isNotBlank()) {
+                    TextButton(onClick = { onWriteEmail(email) }) {
+                        Icon(Icons.Default.Email, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(Strings.writeEmail)
                     }
                 }
-            } else {
-                TextButton(onClick = onAddToContacts) {
-                    Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(Strings.addContact)
+                // Позвонить (если есть телефон)
+                val phoneToCall = phone.ifBlank { mobilePhone }
+                if (phoneToCall.isNotBlank()) {
+                    TextButton(onClick = { onCall(phoneToCall) }) {
+                        Icon(Icons.Default.Call, null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(Strings.callPhone)
+                    }
+                }
+                // Добавить в контакты (для GAL)
+                if (!isLocal) {
+                    TextButton(onClick = onAddToContacts) {
+                        Icon(Icons.Default.PersonAdd, null, modifier = Modifier.size(18.dp))
+                    }
                 }
             }
         },

@@ -886,8 +886,8 @@ fun SetupScreen(
                     onCheckedChange = { acceptAllCerts = it }
                 )
                 Text(
-                    text = if (isRussian()) "Принимать все сертификаты" 
-                           else "Accept all certificates",
+                    text = if (isRussian()) "Принимать все сертификаты (опаснее)" 
+                           else "Accept all certificates (less secure)",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.clickable { acceptAllCerts = !acceptAllCerts }
                 )

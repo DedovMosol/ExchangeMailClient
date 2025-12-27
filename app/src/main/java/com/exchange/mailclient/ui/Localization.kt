@@ -161,11 +161,11 @@ object Strings {
     
     // Режим экономии батареи
     val batterySaverMode: String @Composable get() = if (isRussian()) "Режим экономии батареи" else "Battery saver mode"
-    val batterySaverActive: String @Composable get() = if (isRussian()) "Активен режим экономии" else "Battery saver active"
-    val ignoreBatterySaver: String @Composable get() = if (isRussian()) "Игнорировать режим экономии" else "Ignore battery saver"
+    val batterySaverActive: String @Composable get() = if (isRussian()) "Синхронизация реже (экономия батареи)" else "Sync less often (battery saver)"
+    val ignoreBatterySaver: String @Composable get() = if (isRussian()) "Частая синхронизация" else "Frequent sync"
     val ignoreBatterySaverDesc: String @Composable get() = if (isRussian()) 
-        "Синхронизировать почту даже в режиме экономии батареи" 
-        else "Sync mail even in battery saver mode"
+        "Синхронизировать с обычной частотой даже в режиме экономии" 
+        else "Sync at normal rate even in battery saver mode"
     
     // Интервалы синхронизации
     val syncOff: String @Composable get() = if (isRussian()) "Выключено" else "Off"
@@ -300,8 +300,8 @@ object Strings {
     // Советы по работе с приложением
     val tipsTitle: String @Composable get() = if (isRussian()) "💡 Полезно знать" else "💡 Good to know"
     val tipNotification: String @Composable get() = if (isRussian()) 
-        "Уведомление «Ожидание писем» нельзя убрать — это требование Android для фоновой работы."
-        else "The «Waiting for emails» notification cannot be removed — it's an Android requirement."
+        "Уведомление «Ожидание писем» нельзя убрать — это требование Android для фоновой работы (только в режиме Push)."
+        else "The «Waiting for emails» notification cannot be removed — it's an Android requirement (Push mode only)."
     val tipBattery: String @Composable get() = if (isRussian())
         "Для надёжной доставки писем отключите оптимизацию батареи для приложения в настройках телефона."
         else "For reliable email delivery, disable battery optimization for the app in phone settings."

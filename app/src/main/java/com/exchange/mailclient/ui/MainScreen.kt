@@ -1,5 +1,6 @@
 package com.exchange.mailclient.ui
 
+import android.content.Context
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -40,9 +41,89 @@ import com.exchange.mailclient.data.database.FolderEntity
 import com.exchange.mailclient.data.repository.AccountRepository
 import com.exchange.mailclient.data.repository.MailRepository
 import com.exchange.mailclient.data.repository.SettingsRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
+
+/**
+ * Глобальный контроллер начальной синхронизации
+ * Использует собственный scope чтобы синхронизация не прерывалась при повороте экрана
+ */
+object InitialSyncController {
+    var isSyncing by mutableStateOf(false)
+        private set
+    var syncDone by mutableStateOf(false)
+        private set
+    
+    private var syncJob: Job? = null
+    private var syncStarted = false
+    private val syncScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    
+    fun startSyncIfNeeded(
+        context: Context,
+        accountId: Long,
+        mailRepo: MailRepository,
+        settingsRepo: SettingsRepository
+    ) {
+        // Если синхронизация уже была или уже запущена — пропускаем
+        if (syncDone || syncStarted) {
+            return
+        }
+        
+        syncStarted = true
+        isSyncing = true
+        
+        syncJob = syncScope.launch {
+            try {
+                delay(100) // Небольшая задержка чтобы UI успел отрисоваться
+                
+                // Таймаут на всю синхронизацию - 5 минут
+                withTimeoutOrNull(300_000L) {
+                    // Синхронизируем папки
+                    withContext(Dispatchers.IO) { mailRepo.syncFolders(accountId) }
+                    
+                    delay(200)
+                    
+                    // Синхронизируем ВСЕ папки с письмами ПАРАЛЛЕЛЬНО
+                    val emailFolderTypes = listOf(1, 2, 3, 4, 5, 6, 11, 12)
+                    val currentFolders = withContext(Dispatchers.IO) {
+                        com.exchange.mailclient.data.database.MailDatabase.getInstance(context)
+                            .folderDao().getFoldersByAccountList(accountId)
+                    }
+                    val foldersToSync = currentFolders.filter { it.type in emailFolderTypes }
+                    
+                    withContext(Dispatchers.IO) {
+                        supervisorScope {
+                            foldersToSync.map { folder ->
+                                launch {
+                                    try {
+                                        withTimeoutOrNull(120_000L) {
+                                            mailRepo.syncEmails(accountId, folder.id)
+                                        }
+                                    } catch (_: Exception) { }
+                                }
+                            }.forEach { it.join() }
+                        }
+                    }
+                    
+                    settingsRepo.setLastSyncTime(System.currentTimeMillis())
+                }
+            } catch (_: Exception) { }
+            
+            isSyncing = false
+            syncDone = true
+        }
+    }
+    
+    /**
+     * Сброс состояния (для тестов или при смене аккаунта)
+     */
+    fun reset() {
+        syncJob?.cancel()
+        syncJob = null
+        syncStarted = false
+        syncDone = false
+        isSyncing = false
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,13 +150,14 @@ fun MainScreen(
     var folders by remember { mutableStateOf<List<FolderEntity>>(emptyList()) }
     var flaggedCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(false) }
-    var isSyncing by remember { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
     var accountsLoaded by remember { mutableStateOf(false) }
     // Флаг что данные загружены (для предотвращения мерцания)
     var dataLoaded by remember { mutableStateOf(false) }
-    // Флаг что начальная синхронизация уже выполнена (сохраняется при навигации)
-    var initialSyncDone by rememberSaveable { mutableStateOf(false) }
+    
+    // Состояние синхронизации из глобального контроллера
+    val isSyncing = InitialSyncController.isSyncing
+    val initialSyncDone = InitialSyncController.syncDone
     
     // Диалог создания папки
     var showCreateFolderDialog by remember { mutableStateOf(false) }
@@ -121,60 +203,10 @@ fun MainScreen(
     }
     
     // Автоматическая синхронизация — ОДИН РАЗ при запуске приложения
+    // Используем глобальный контроллер чтобы синхронизация не прерывалась при повороте экрана
     LaunchedEffect(activeAccount?.id) {
         val account = activeAccount ?: return@LaunchedEffect
-        
-        // Если синхронизация уже была — пропускаем
-        if (initialSyncDone) {
-            return@LaunchedEffect
-        }
-        
-        // Небольшая задержка чтобы UI успел отрисоваться
-        kotlinx.coroutines.delay(100)
-        
-        isSyncing = true
-        
-        try {
-            // Таймаут на всю синхронизацию - 5 минут (для больших ящиков)
-            kotlinx.coroutines.withTimeoutOrNull(300_000L) {
-                // Синхронизируем папки
-                withContext(Dispatchers.IO) { mailRepo.syncFolders(account.id) }
-                
-                // Ждём пока папки загрузятся через Flow
-                kotlinx.coroutines.delay(200)
-                
-                // Синхронизируем ВСЕ папки с письмами ПАРАЛЛЕЛЬНО
-                // Типы: 1=пользовательская, 2=Входящие, 3=Черновики, 4=Удалённые, 5=Отправленные, 6=Исходящие, 11=Спам, 12=пользовательская почтовая
-                val emailFolderTypes = listOf(1, 2, 3, 4, 5, 6, 11, 12)
-                val currentFolders = withContext(Dispatchers.IO) {
-                    com.exchange.mailclient.data.database.MailDatabase.getInstance(context)
-                        .folderDao().getFoldersByAccountList(account.id)
-                }
-                val foldersToSync = currentFolders.filter { it.type in emailFolderTypes }
-                
-                // Запускаем синхронизацию всех папок параллельно
-                withContext(Dispatchers.IO) {
-                    kotlinx.coroutines.supervisorScope {
-                        foldersToSync.map { folder ->
-                            launch {
-                                try {
-                                    // Таймаут на каждую папку - 2 минуты (для больших папок)
-                                    kotlinx.coroutines.withTimeoutOrNull(120_000L) {
-                                        mailRepo.syncEmails(account.id, folder.id)
-                                    }
-                                } catch (_: Exception) { }
-                            }
-                        }.forEach { it.join() }
-                    }
-                }
-                
-                // Сохраняем время синхронизации
-                settingsRepo.setLastSyncTime(System.currentTimeMillis())
-            }
-        } catch (_: Exception) { }
-        
-        isSyncing = false
-        initialSyncDone = true // Помечаем что синхронизация выполнена
+        InitialSyncController.startSyncIfNeeded(context, account.id, mailRepo, settingsRepo)
     }
     
     // Первичная проверка - есть ли аккаунты (только один раз)
@@ -592,6 +624,7 @@ fun MainScreen(
                 isSyncing = isSyncing,
                 onSyncFolders = { syncFolders() },
                 onFolderClick = onNavigateToEmailList,
+                onContactsClick = onNavigateToContacts,
                 modifier = Modifier.padding(padding)
             )
         }
@@ -608,6 +641,7 @@ private fun HomeContent(
     isSyncing: Boolean = false,
     onSyncFolders: () -> Unit,
     onFolderClick: (String) -> Unit,
+    onContactsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -636,6 +670,7 @@ private fun HomeContent(
     val refreshText = Strings.refresh
     val emailsCountText = Strings.emailsCount
     val emptyText = Strings.empty
+    val contactsName = Strings.contacts
     
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -891,22 +926,32 @@ private fun HomeContent(
             val mainFolders = folders.filter { it.type in listOf(2, 3, 4, 5) }
             
             data class FolderDisplay(val id: String, val name: String, val count: Int, val unreadCount: Int, val type: Int)
-            val displayFolders = mainFolders.map { folder ->
-                val localizedName = when (folder.type) {
-                    2 -> inboxName
-                    3 -> draftsName
-                    4 -> trashName
-                    5 -> sentName
-                    else -> folder.displayName
-                }
-                FolderDisplay(
-                    folder.id, 
-                    localizedName, 
-                    folder.totalCount, 
-                    folder.unreadCount, 
-                    folder.type
-                ) 
-            } + FolderDisplay("favorites", favoritesName, flaggedCount, 0, -1)
+            
+            // Порядок: Входящие, Отправленные, Черновики, Удалённые, Избранные, Контакты
+            val orderedFolders = mutableListOf<FolderDisplay>()
+            
+            // Входящие (type 2)
+            mainFolders.find { it.type == 2 }?.let { folder ->
+                orderedFolders.add(FolderDisplay(folder.id, inboxName, folder.totalCount, folder.unreadCount, folder.type))
+            }
+            // Отправленные (type 5)
+            mainFolders.find { it.type == 5 }?.let { folder ->
+                orderedFolders.add(FolderDisplay(folder.id, sentName, folder.totalCount, folder.unreadCount, folder.type))
+            }
+            // Черновики (type 3)
+            mainFolders.find { it.type == 3 }?.let { folder ->
+                orderedFolders.add(FolderDisplay(folder.id, draftsName, folder.totalCount, folder.unreadCount, folder.type))
+            }
+            // Удалённые (type 4)
+            mainFolders.find { it.type == 4 }?.let { folder ->
+                orderedFolders.add(FolderDisplay(folder.id, trashName, folder.totalCount, folder.unreadCount, folder.type))
+            }
+            // Избранные
+            orderedFolders.add(FolderDisplay("favorites", favoritesName, flaggedCount, 0, -1))
+            // Контакты
+            orderedFolders.add(FolderDisplay("contacts", contactsName, 0, 0, -2))
+            
+            val displayFolders = orderedFolders.toList()
             
             val chunkedFolders = displayFolders.chunked(2)
             itemsIndexed(chunkedFolders) { index, rowFolders ->
@@ -942,7 +987,10 @@ private fun HomeContent(
                                     count = folder.count,
                                     unreadCount = folder.unreadCount,
                                     type = folder.type,
-                                    onClick = { onFolderClick(folder.id) },
+                                    onClick = { 
+                                        if (folder.id == "contacts") onContactsClick() 
+                                        else onFolderClick(folder.id) 
+                                    },
                                     modifier = if (rowFolders.size == 1) {
                                         Modifier.fillMaxWidth(0.48f)
                                     } else {
@@ -965,7 +1013,10 @@ private fun HomeContent(
                                 count = folder.count,
                                 unreadCount = folder.unreadCount,
                                 type = folder.type,
-                                onClick = { onFolderClick(folder.id) },
+                                onClick = { 
+                                    if (folder.id == "contacts") onContactsClick() 
+                                    else onFolderClick(folder.id) 
+                                },
                                 modifier = if (rowFolders.size == 1) {
                                     Modifier.fillMaxWidth(0.48f)
                                 } else {
@@ -1198,7 +1249,7 @@ private fun HomeContent(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "v1.1.0",
+                                text = "v1.1.1",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1684,6 +1735,10 @@ private fun FolderCardDisplay(
             Icons.Default.Star, 
             listOf(Color(0xFFFFCA28), Color(0xFFFFA000)) // Amber
         )
+        -2 -> FolderColors(
+            Icons.Default.Contacts, 
+            listOf(Color(0xFF4FC3F7), Color(0xFF29B6F6)) // Light Blue
+        )
         else -> FolderColors(
             Icons.Default.Folder, 
             listOf(Color(0xFF90A4AE), Color(0xFF78909C)) // Blue Grey Light
@@ -1745,14 +1800,17 @@ private fun FolderCardDisplay(
                         color = Color.White
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = when {
-                            count > 0 -> "$count ${Strings.emailsCount}"
-                            else -> Strings.empty
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.8f)
-                    )
+                    // Для контактов не показываем "писем"
+                    if (type != -2) {
+                        Text(
+                            text = when {
+                                count > 0 -> "$count ${Strings.emailsCount}"
+                                else -> Strings.empty
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.8f)
+                        )
+                    }
                 }
                 
                 // Badge с непрочитанными — с пульсацией (если анимации включены)

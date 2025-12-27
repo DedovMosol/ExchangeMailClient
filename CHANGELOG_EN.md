@@ -1,5 +1,26 @@
 # Changelog
 
+## v1.1.1 (27.12.2025)
+
+### Bug Fixes
+- **Clipboard button order** — Cut → Copy → Paste
+- **Contact menu** — added "Edit" and "Delete" to three-dot menu
+- **Contact dialog buttons** — "Cancel" and "Save" moved to opposite sides
+- **Sync on screen rotation** — sync no longer interrupts when orientation changes
+- **Contact details dialog** — redesigned, action buttons at bottom
+- **Trash cleanup on navigation** — deletion continues even when leaving trash folder
+- **Compact edit dialog** — fields grouped in rows
+- **Certificate text** — added warning "(less secure)"
+- **Notifications on first launch** — not shown for old emails
+- **Folder order on main screen** — Inbox/Sent, Drafts/Trash, Favorites/Contacts
+
+### Improvements
+- **Battery Saver setting text** — reworded to "Frequent sync"
+- **Push notification tip** — clarified it's Push mode only
+- **Contacts card** — added to main screen (light blue)
+
+---
+
 ## v1.1.0 (27.12.2025)
 
 ### New Features

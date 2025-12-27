@@ -220,9 +220,14 @@ class MainActivity : ComponentActivity() {
             // Контроллер отложенного удаления
             val deletionController = remember { com.exchange.mailclient.ui.components.DeletionController() }
             
+            // Кастомный TextToolbar с правильным порядком кнопок
+            val view = androidx.compose.ui.platform.LocalView.current
+            val customTextToolbar = remember(view) { com.exchange.mailclient.ui.theme.CustomTextToolbar(view) }
+            
             CompositionLocalProvider(
                 LocalLanguage provides currentLanguage,
-                com.exchange.mailclient.ui.components.LocalDeletionController provides deletionController
+                com.exchange.mailclient.ui.components.LocalDeletionController provides deletionController,
+                androidx.compose.ui.platform.LocalTextToolbar provides customTextToolbar
             ) {
                 ExchangeMailTheme(fontScale = fontSize.scale, colorTheme = colorTheme, animationsEnabled = animationsEnabled) {
                     Box(modifier = Modifier.fillMaxSize()) {

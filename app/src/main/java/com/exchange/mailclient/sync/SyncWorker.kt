@@ -51,7 +51,13 @@ class SyncWorker(
         val accounts = database.accountDao().getAllAccountsList()
         if (accounts.isEmpty()) return Result.success()
         
-        val lastNotificationCheck = settingsRepo.getLastNotificationCheckTimeSync()
+        var lastNotificationCheck = settingsRepo.getLastNotificationCheckTimeSync()
+        // При первом запуске (lastNotificationCheck = 0) не показываем уведомления для старых писем
+        val isFirstRun = lastNotificationCheck == 0L
+        if (isFirstRun) {
+            lastNotificationCheck = System.currentTimeMillis() - 60_000 // Только письма за последнюю минуту
+        }
+        
         // Собираем новые письма по аккаунтам
         val newEmailsByAccount = mutableMapOf<Long, MutableList<NewEmailInfo>>()
         var hasErrors = false

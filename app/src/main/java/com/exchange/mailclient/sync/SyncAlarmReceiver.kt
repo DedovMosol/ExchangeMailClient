@@ -40,7 +40,11 @@ class SyncAlarmReceiver : BroadcastReceiver() {
                     val mailRepo = MailRepository(context)
                     
                     // Выполняем синхронизацию напрямую
-                    val lastNotificationCheck = settingsRepo.getLastNotificationCheckTimeSync()
+                    var lastNotificationCheck = settingsRepo.getLastNotificationCheckTimeSync()
+                    // При первом запуске не показываем уведомления для старых писем
+                    if (lastNotificationCheck == 0L) {
+                        lastNotificationCheck = System.currentTimeMillis() - 60_000
+                    }
                     var newEmailCount = 0
                     var latestSenderName: String? = null
                     var latestSubject: String? = null
